@@ -1,0 +1,34 @@
+[workspace]
+members = ["crates/pyre-core", "crates/pyre-telemetry"]
+resolver = "2"
+[workspace.package]
+edition = "2021"
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
+
+[workspace.dependencies]
+pyre-telemetry = { path = "crates/pyre-telemetry" }
+
+thiserror = { version = "2.0.12" }
+color-eyre = "0.6.3"
+
+tracing = { version = "0.1.40" }
+
+tokio = { version = "1.44.2", features = [
+    "fs",
+    "rt-multi-thread",
+    "macros",
+    "tracing",
+] }
+tokio-util = { version = "0.7.14" }
+
+futures = "0.3.31"
+futures-util = "0.3.31"
+
+serde = { version = "1.0.219", features = ["derive"] }
+chrono = { version = "0.4.40", features = ["serde"] }
+strum = { version = "0.27.1", features = ["derive"] }
+bitflags = { version = "2.9.0", features = ["serde"] }

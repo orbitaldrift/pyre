@@ -1,0 +1,7 @@
+[telemetry]
+domain = "odrift"
+mode = { Otlp = {} }
+layers = "metrics,traces"
+filter = "info"
+metrics_interval_secs = 10
+temporality = { Cumulative = {} }
