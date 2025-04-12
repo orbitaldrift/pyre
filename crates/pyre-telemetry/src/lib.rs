@@ -54,19 +54,20 @@ pub struct Telemetry {
 
 impl Default for Telemetry {
     fn default() -> Self {
-        Self::new_with_stdout(Default::default())
+        Self::new_with_stdout(Config::default())
     }
 }
 
 impl Telemetry {
     /// Create a new telemetry instance with the given unique ID and configuration.
     /// Usually the unique Id is the public key of the user.
+    #[must_use]
     pub fn new(config: Config, info: Info) -> Self {
         match config.mode {
             Mode::Stdout => Self::new_with_stdout(config),
             Mode::Alloy | Mode::Otlp | Mode::Dual | Mode::Custom(_) => {
                 let resource = Self::get_resource(info);
-                Self::new_with_otlp(config, resource)
+                Self::new_with_otlp(config, &resource)
             }
         }
     }
@@ -98,7 +99,7 @@ impl Telemetry {
     }
 
     /// Initialize telemetry with OTLP exporters for production environments.
-    fn new_with_otlp(config: Config, resource: Resource) -> Self {
+    fn new_with_otlp(config: Config, resource: &Resource) -> Self {
         let layers: Layers = config.layers.clone().into();
         let endpoints: Vec<Endpoint> = config.mode.clone().into();
 
@@ -117,6 +118,7 @@ impl Telemetry {
     }
 
     /// Temporary function to use stdout telemetry before the full telemetry is set up.
+    #[must_use]
     pub fn stdout() -> DefaultGuard {
         tracing::subscriber::set_default(
             Registry::default()
@@ -126,6 +128,9 @@ impl Telemetry {
     }
 
     /// Initialize the telemetry provider with a suspendable layer.
+    ///
+    /// # Errors
+    /// If a global default subscriber has already been set, this function will return an error.
     pub fn init_suspendable<S>(self, layer: S) -> Result<Self, Error>
     where
         S: Suspendable + Send + Sync + 'static,
@@ -146,6 +151,9 @@ impl Telemetry {
     }
 
     /// Initialize the global telemetry providers and set up tracing subscribers.
+    ///
+    /// # Errors
+    /// If a global default subscriber has already been set, this function will return an error.
     pub fn init(self) -> Result<Self, Error> {
         let filter = self.get_filter();
 
@@ -302,12 +310,17 @@ impl Telemetry {
 
 #[cfg(test)]
 mod tests {
-    use tracing::info;
-
     #[test]
     fn test_default_init() {
-        let telemetry = super::Telemetry::default().init();
-        assert!(telemetry.is_ok());
+        {
+            let _guard = super::Telemetry::stdout();
+            tracing::info!("Test counter");
+
+            let telemetry = super::Telemetry::default().init().inspect_err(|e| {
+                tracing::error!("Failed to initialize telemetry: {}", e);
+            });
+            assert!(telemetry.is_ok());
+        }
 
         tracing::info!(counter.foo = 1, "Test counter");
         tracing::info!(histogram.foo = 1, "Test histogram");
@@ -318,17 +331,5 @@ mod tests {
         }
 
         sum(1, 1);
-    }
-
-    #[test]
-    fn test_stdout() {
-        {
-            let _guard = super::Telemetry::stdout();
-            tracing::info!("Test counter");
-
-            super::Telemetry::default().init().unwrap();
-        }
-
-        info!(counter.foo = 1, "Test counter");
     }
 }

@@ -20,8 +20,8 @@ impl Default for Config {
             layers: "metrics".to_string(),
             filter: "info".to_string(),
             interval: 30,
-            temporality: Default::default(),
-            mode: Default::default(),
+            temporality: Temporality::default(),
+            mode: Mode::default(),
         }
     }
 }

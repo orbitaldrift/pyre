@@ -69,6 +69,6 @@ mod tests {
     async fn test_from_toml_path() {
         let config = TestConfig::from_toml_path::<PathBuf>(None).await;
         assert!(config.is_ok());
-        assert!(!config.unwrap().0.foo.is_empty())
+        assert!(!config.unwrap().0.foo.is_empty());
     }
 }

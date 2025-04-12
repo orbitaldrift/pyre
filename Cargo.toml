@@ -17,7 +17,7 @@ color-eyre = "0.6.3"
 
 tracing = { version = "0.1.40" }
 
-tokio = { version = "1.44.2", features = [
+tokio = { version = "1.44.2", default-features = false, features = [
     "fs",
     "rt-multi-thread",
     "macros",
