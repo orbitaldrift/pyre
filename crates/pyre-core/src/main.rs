@@ -44,8 +44,6 @@ async fn main() -> color_eyre::Result<()> {
         .expect("failed to initialize telemetry");
     }
 
-    compute(5, 10);
-
     let mut shutdown = Shutdown::new_with_all_signals().install().subscribe();
 
     let handle = tokio::spawn(async move {
@@ -63,11 +61,4 @@ async fn main() -> color_eyre::Result<()> {
 
     let _ = handle.await;
     Ok(())
-}
-
-#[tracing::instrument]
-fn compute(a: i32, b: i32) -> i32 {
-    info!(counter.computer = 1, "Computing");
-
-    a + b
 }
