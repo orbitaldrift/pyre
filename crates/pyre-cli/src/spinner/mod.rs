@@ -1,0 +1,101 @@
+use std::time::Duration;
+
+use indicatif::ProgressBar;
+use pyre_telemetry::suspendable::Suspendable;
+use termion::color;
+
+const TICK_STRINGS: [&str; 12] = ["π", "∫", "∑", "∆", "∇", "π", "∂", "∏", "∞", "√", "𝜆", "𝛾"];
+
+#[derive(Clone)]
+pub enum SpinnerTemplate {
+    Default,
+    Progress,
+}
+
+#[derive(Debug, Clone)]
+pub struct Spinner {
+    spinner: ProgressBar,
+    current_step: u8,
+    total_steps: u8,
+}
+
+impl Spinner {
+    const DEFAULT_TEMPLATE: &'static str =
+        "{prefix} {spinner:.magenta} {elapsed:.yellow} {msg:.magenta}";
+    const PROGRESS_TEMPLATE: &'static str =
+        "{bar:.magenta/blue} {bytes}/{total_bytes} {eta:.yellow}";
+
+    /// Create a new spinner with the given total steps and message.
+    /// The spinner will be styled according to the given template.
+    ///
+    /// # Panics
+    /// This function will panic if the template is invalid.
+    #[must_use]
+    pub fn new(total_steps: u8, message: &str, template: &SpinnerTemplate) -> Self {
+        let tpl = match template {
+            SpinnerTemplate::Default => Self::DEFAULT_TEMPLATE.to_string(),
+            SpinnerTemplate::Progress => {
+                format!("{} {}", Self::DEFAULT_TEMPLATE, Self::PROGRESS_TEMPLATE)
+            }
+        };
+
+        let spinner = ProgressBar::new_spinner().with_prefix(format!("[{}/{}]", 1, total_steps));
+        spinner.set_style(
+            indicatif::ProgressStyle::with_template(tpl.as_str())
+                .expect("progress bar template is invalid")
+                .tick_strings(&TICK_STRINGS),
+        );
+        spinner.set_message(message.to_string());
+        spinner.enable_steady_tick(Duration::from_millis(100));
+
+        Spinner {
+            spinner,
+            current_step: 1,
+            total_steps,
+        }
+    }
+
+    pub fn next_step(&mut self, message: &str) {
+        // Leave the last step in the log.
+        // indicatif sadly doesn't have anything nice to make that happen,
+        // so we trick it into deleting some empty space instead of the last step
+        let msglen = self.spinner.message().len() + 1;
+        let spaces = " ".repeat(msglen);
+        println!("{spaces}");
+
+        self.current_step += 1;
+
+        self.spinner
+            .set_prefix(format!("[{}/{}]", self.current_step, self.total_steps));
+        self.spinner.set_message(message.to_string());
+    }
+
+    pub fn success(&self, message: &str) {
+        self.spinner.finish_with_message(format!(
+            "{}✓ {}{}",
+            color::Fg(color::Green),
+            message,
+            color::Fg(color::Reset)
+        ));
+    }
+
+    pub fn fail(&self, message: &str) {
+        self.spinner.finish_with_message(format!(
+            "{}✕ {}{}",
+            color::Fg(color::Red),
+            message,
+            color::Fg(color::Reset)
+        ));
+    }
+
+    #[must_use]
+    pub fn inner(&self) -> &ProgressBar {
+        &self.spinner
+    }
+}
+
+impl Suspendable for Spinner {
+    fn suspend<F: FnOnce() -> R, R>(&self, f: F) -> R {
+        self.spinner.suspend(f)
+    }
+}

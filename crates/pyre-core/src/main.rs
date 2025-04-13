@@ -1,6 +1,9 @@
 use std::{path::PathBuf, process::exit, time::Duration};
 
-use config::{toml::FromToml, Config};
+use config::Config;
+use pyre_build::build_info;
+use pyre_cli::shutdown::Shutdown;
+use pyre_fs::toml::FromToml;
 use pyre_telemetry::{Info, Telemetry};
 use tracing::{error, info};
 use uuid::Uuid;
@@ -12,6 +15,7 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> color_eyre::Result<()> {
+    build_info!();
     color_eyre::install()?;
 
     {
@@ -42,7 +46,22 @@ async fn main() -> color_eyre::Result<()> {
 
     compute(5, 10);
 
-    tokio::time::sleep(Duration::from_secs(20)).await;
+    let mut shutdown = Shutdown::new_with_all_signals().install().subscribe();
+
+    let handle = tokio::spawn(async move {
+        loop {
+            tokio::select! {
+                _ = shutdown.recv() => {
+                    info!("task shutting down");
+                }
+                () = tokio::time::sleep(Duration::from_secs(20)) => {
+                    break;
+                }
+            }
+        }
+    });
+
+    let _ = handle.await;
     Ok(())
 }
 

@@ -12,7 +12,10 @@ use opentelemetry_sdk::{
     Resource,
 };
 use suspendable::{Suspendable, SuspendableLayer};
-use tracing::subscriber::{DefaultGuard, SetGlobalDefaultError};
+use tracing::{
+    info,
+    subscriber::{DefaultGuard, SetGlobalDefaultError},
+};
 use tracing_subscriber::{
     fmt::{self, format::FmtSpan},
     layer::SubscriberExt,
@@ -135,6 +138,8 @@ impl Telemetry {
     where
         S: Suspendable + Send + Sync + 'static,
     {
+        info!(config = %self.config, "initializing suspendable telemetry");
+
         let layer: SuspendableLayer<Registry, fmt::Layer<Registry>, S> =
             SuspendableLayer::new(Self::default_fmt_layer(), layer);
 
@@ -155,6 +160,8 @@ impl Telemetry {
     /// # Errors
     /// If a global default subscriber has already been set, this function will return an error.
     pub fn init(self) -> Result<Self, Error> {
+        info!(config = %self.config, "initializing global telemetry");
+
         let filter = self.get_filter();
 
         let logs_layer = self

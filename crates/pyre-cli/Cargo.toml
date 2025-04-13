@@ -1,0 +1,23 @@
+[package]
+name = "pyre-cli"
+version = "0.1.0"
+description = "Pyre CLI."
+
+edition.workspace = true
+
+authors = ["Orbital Drift"]
+homepage = "https://odlabs.xyz"
+repository = "https://github.com/orbitaldrift/pyre"
+documentation = "https://docs.odlabs.xyz"
+
+keywords = ["web", "api"]
+categories = ["web-programming"]
+
+[dependencies]
+pyre-telemetry = { workspace = true }
+
+tracing = { workspace = true }
+tokio = { workspace = true, features = ["signal"] }
+termion = { workspace = true }
+
+indicatif = "0.17.11"

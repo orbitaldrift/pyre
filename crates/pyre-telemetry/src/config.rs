@@ -1,9 +1,8 @@
-use std::time::Duration;
+use std::{fmt::Display, time::Duration};
 
 use bitflags::bitflags;
 use opentelemetry_otlp::ExportConfig;
 use serde::{Deserialize, Serialize};
-use strum::Display;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
@@ -12,6 +11,16 @@ pub struct Config {
     pub filter: String,
     pub interval: u64,
     pub temporality: Temporality,
+}
+
+impl Display for Config {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{{ mode: {}, layers: {}, filter: {}, interval: {}, temporality: {} }}",
+            self.mode, self.layers, self.filter, self.interval, self.temporality
+        )
+    }
 }
 
 impl Default for Config {
@@ -26,7 +35,7 @@ impl Default for Config {
     }
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, strum::Display, Clone, Default, Serialize, Deserialize)]
 pub enum Temporality {
     #[default]
     Cumulative,
@@ -42,7 +51,7 @@ impl From<Temporality> for opentelemetry_sdk::metrics::Temporality {
     }
 }
 
-#[derive(Debug, Clone, Display, Default, Serialize, Deserialize)]
+#[derive(Debug, strum::Display, Clone, Default, Serialize, Deserialize)]
 pub enum Mode {
     #[default]
     Stdout,
@@ -66,7 +75,7 @@ impl From<Mode> for Vec<Endpoint> {
     }
 }
 
-#[derive(Debug, Clone, Display, Serialize, Deserialize)]
+#[derive(Debug, strum::Display, Clone, Serialize, Deserialize)]
 pub enum Endpoint {
     #[strum(to_string = "http://localhost:4317")]
     LocalAlloy,

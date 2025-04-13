@@ -14,6 +14,9 @@ keywords = ["web", "api"]
 categories = ["web-programming"]
 
 [dependencies]
+pyre-build = { workspace = true }
+pyre-cli = { workspace = true }
+pyre-fs = { workspace = true }
 pyre-telemetry = { workspace = true }
 
 color-eyre = { workspace = true }
@@ -42,4 +45,8 @@ reqwest = { version = "0.12.15", default-features = false, features = [
     "stream",
     "zstd",
 ] }
-toml = "0.8.20"
+
+[build-dependencies]
+pyre-build = { workspace = true }
+color-eyre = { workspace = true }
+vergen-git2 = { workspace = true }

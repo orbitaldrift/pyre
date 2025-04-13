@@ -1,6 +1,13 @@
 [workspace]
-members = ["crates/pyre-core", "crates/pyre-telemetry"]
+members = [
+    "crates/pyre-build",
+    "crates/pyre-core",
+    "crates/pyre-cli",
+    "crates/pyre-fs",
+    "crates/pyre-telemetry",
+]
 resolver = "2"
+
 [workspace.package]
 edition = "2021"
 
@@ -10,12 +17,21 @@ codegen-units = 1
 panic = "abort"
 
 [workspace.dependencies]
+pyre-build = { path = "crates/pyre-build" }
+pyre-cli = { path = "crates/pyre-cli" }
+pyre-fs = { path = "crates/pyre-fs" }
 pyre-telemetry = { path = "crates/pyre-telemetry" }
 
 thiserror = { version = "2.0.12" }
 color-eyre = "0.6.3"
 
 tracing = { version = "0.1.40" }
+tracing-subscriber = { version = "0.3.18", features = [
+    "registry",
+    "std",
+    "fmt",
+    "env-filter",
+] }
 
 tokio = { version = "1.44.2", default-features = false, features = [
     "fs",
@@ -28,7 +44,18 @@ tokio-util = { version = "0.7.14" }
 futures = "0.3.31"
 futures-util = "0.3.31"
 
+async-trait = { version = "0.1.88" }
+
 serde = { version = "1.0.219", features = ["derive"] }
 chrono = { version = "0.4.40", features = ["serde"] }
 strum = { version = "0.27.1", features = ["derive"] }
 bitflags = { version = "2.9.0", features = ["serde"] }
+toml = "0.8.20"
+termion = "4.0.5"
+
+vergen-git2 = { version = "1.0.2", features = [
+    "build",
+    "cargo",
+    "rustc",
+    "si",
+] }

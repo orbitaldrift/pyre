@@ -21,6 +21,8 @@ pub enum Error {
 }
 
 pub trait FromToml: Sized {
+    /// Reads a TOML file from the specified path, or the default path if none is provided.
+    /// Returns the parsed configuration and the path used.
     #[tracing::instrument]
     fn from_toml_path<P>(path: Option<P>) -> impl Future<Output = Result<(Self, P), Error>> + Send
     where
@@ -33,7 +35,7 @@ pub trait FromToml: Sized {
                 None => P::from(Self::default_path()),
             };
 
-            info!("reading {}", path.as_ref().display());
+            info!(file = %path.as_ref().display(), "reading toml");
 
             let file_contents = tokio::fs::read(path.as_ref())
                 .await

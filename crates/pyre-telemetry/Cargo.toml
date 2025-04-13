@@ -20,7 +20,6 @@ name = "otlp"
 path = "src/bin/otlp.rs"
 
 [dependencies]
-color-eyre = { workspace = true }
 thiserror = { workspace = true }
 
 tracing = { workspace = true }
@@ -33,12 +32,7 @@ serde = { workspace = true }
 strum = { workspace = true }
 bitflags = { workspace = true }
 
-tracing-subscriber = { version = "0.3.18", features = [
-    "registry",
-    "std",
-    "fmt",
-    "env-filter",
-] }
+tracing-subscriber = { workspace = true }
 
 tracing-opentelemetry = { version = "0.30.0" }
 
@@ -73,14 +67,10 @@ opentelemetry-resource-detectors = { version = "0.8.0" }
 opentelemetry-semantic-conventions = { version = "0.29.0" }
 opentelemetry-proto = { version = "0.29.0" }
 
-chrono = "0.4.40"
-
 tonic = { version = "0.12.3", default-features = false, features = [
     "server",
     "zstd",
 ] }
-
-hex = { version = "0.4.3" }
 
 clap = { version = "4.2.0", default-features = false, features = [
     "std",
