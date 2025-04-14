@@ -18,7 +18,7 @@ env:
   CARGO_TERM_COLOR: always
   SCCACHE_GHA_ENABLED: "true"
   RUSTC_WRAPPER: "sccache"
-  
+
 jobs:
   clippy:
     name: Clippy
@@ -36,6 +36,9 @@ jobs:
 
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
+
+      - name: Install mold
+        uses: rui314/setup-mold@v1
 
       - name: Run clippy
         run: cargo clippy --all-targets --all-features -- -D warnings -W clippy::pedantic -W clippy::all
@@ -73,6 +76,9 @@ jobs:
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
 
+      - name: Install mold
+        uses: rui314/setup-mold@v1
+        
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
       

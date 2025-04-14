@@ -1,0 +1,21 @@
+[package]
+name = "pyre-crypto"
+version = "0.1.0"
+description = "Pyre crypto."
+
+edition.workspace = true
+
+authors = ["Orbital Drift"]
+homepage = "https://odlabs.xyz"
+repository = "https://github.com/orbitaldrift/pyre"
+documentation = "https://docs.odlabs.xyz"
+
+keywords = ["web", "api"]
+categories = ["web-programming"]
+
+[dependencies]
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+rcgen = "0.13.2"
+rustls = { workspace = true }

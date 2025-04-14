@@ -57,7 +57,7 @@ pub struct Telemetry {
 
 impl Default for Telemetry {
     fn default() -> Self {
-        Self::new_with_stdout(Config::default())
+        Self::new_with_stdout(&Config::default())
     }
 }
 
@@ -65,7 +65,7 @@ impl Telemetry {
     /// Create a new telemetry instance with the given unique ID and configuration.
     /// Usually the unique Id is the public key of the user.
     #[must_use]
-    pub fn new(config: Config, info: Info) -> Self {
+    pub fn new(config: &Config, info: Info) -> Self {
         match config.mode {
             Mode::Stdout => Self::new_with_stdout(config),
             Mode::Alloy | Mode::Otlp | Mode::Dual | Mode::Custom(_) => {
@@ -76,7 +76,7 @@ impl Telemetry {
     }
 
     /// Initialize telemetry with stdout exporters for local development.
-    fn new_with_stdout(config: Config) -> Self {
+    fn new_with_stdout(config: &Config) -> Self {
         let layers: Layers = config.layers.clone().into();
 
         let tracer_provider = layers.contains(Layers::Traces).then(|| {
@@ -97,12 +97,12 @@ impl Telemetry {
             tracer_provider,
             meter_provider,
             logger_provider: None,
-            config,
+            config: config.clone(),
         }
     }
 
     /// Initialize telemetry with OTLP exporters for production environments.
-    fn new_with_otlp(config: Config, resource: &Resource) -> Self {
+    fn new_with_otlp(config: &Config, resource: &Resource) -> Self {
         let layers: Layers = config.layers.clone().into();
         let endpoints: Vec<Endpoint> = config.mode.clone().into();
 
@@ -116,7 +116,7 @@ impl Telemetry {
                 config.temporality.clone(),
             ),
             logger_provider: Self::get_logs(&layers, resource.clone()),
-            config,
+            config: config.clone(),
         }
     }
 

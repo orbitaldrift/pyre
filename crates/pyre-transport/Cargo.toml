@@ -1,0 +1,26 @@
+[package]
+name = "pyre-transport"
+version = "0.1.0"
+description = "Pyre transport."
+
+edition.workspace = true
+
+authors = ["Orbital Drift"]
+homepage = "https://odlabs.xyz"
+repository = "https://github.com/orbitaldrift/pyre"
+documentation = "https://docs.odlabs.xyz"
+
+keywords = ["web", "api"]
+categories = ["web-programming"]
+
+[dependencies]
+axum = { workspace = true }
+tracing = { workspace = true }
+futures = { workspace = true }
+tokio = { workspace = true }
+
+h3 = { version = "0.0.7" }
+h3-quinn = { version = "0.0.9" }
+hyper = { version = "1.6.0", default-features = false }
+hyper-util = { version = "0.1.11" }
+tower = { version = "0.5.2", default-features = false, features = ["util"] }

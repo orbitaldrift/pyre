@@ -16,8 +16,10 @@ categories = ["web-programming"]
 [dependencies]
 pyre-build = { workspace = true }
 pyre-cli = { workspace = true }
+pyre-crypto = { workspace = true }
 pyre-fs = { workspace = true }
 pyre-telemetry = { workspace = true }
+pyre-transport = { workspace = true }
 
 color-eyre = { workspace = true }
 thiserror = { workspace = true }
@@ -33,6 +35,8 @@ chrono = { workspace = true }
 futures = { workspace = true }
 futures-util = { workspace = true }
 
+rustls = { workspace = true }
+
 tikv-jemallocator = { version = "0.6.0" }
 
 uuid = { version = "1.16.0", features = ["v4"] }
@@ -45,6 +49,25 @@ reqwest = { version = "0.12.15", default-features = false, features = [
     "stream",
     "zstd",
 ] }
+
+quinn = { version = "0.11.7", default-features = false, features = [
+    "runtime-tokio",
+    "rustls",
+    "ring",
+] }
+axum = { workspace = true, features = [
+    "tokio",
+    "tracing",
+    "http2",
+    "json",
+    "macros",
+    "ws",
+] }
+tokio-rustls = { version = "0.26.2", features = ["ring"] }
+hyper = { version = "1.6.0", default-features = false, features = ["http2"] }
+hyper-util = { version = "0.1.11", features = ["http2"] }
+tower-service = "0.3.3"
+h3 = { version = "0.0.7" }
 
 [build-dependencies]
 pyre-build = { workspace = true }

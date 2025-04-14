@@ -1,7 +1,12 @@
+[server]
+addr = "127.0.0.1:4433"
+cert = "etc/localhost/local.cert"
+key = "etc/localhost/local.key"
+
 [telemetry]
 domain = "odrift"
-mode = { Otlp = {} }
-layers = "metrics,traces"
+mode = { Stdout = {} }
+layers = ""
 filter = "info"
 interval = 10
 temporality = { Cumulative = {} }

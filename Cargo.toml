@@ -3,8 +3,10 @@ members = [
     "crates/pyre-build",
     "crates/pyre-core",
     "crates/pyre-cli",
+    "crates/pyre-crypto",
     "crates/pyre-fs",
     "crates/pyre-telemetry",
+    "crates/pyre-transport",
 ]
 resolver = "2"
 
@@ -19,8 +21,10 @@ panic = "abort"
 [workspace.dependencies]
 pyre-build = { path = "crates/pyre-build" }
 pyre-cli = { path = "crates/pyre-cli" }
+pyre-crypto = { path = "crates/pyre-crypto" }
 pyre-fs = { path = "crates/pyre-fs" }
 pyre-telemetry = { path = "crates/pyre-telemetry" }
+pyre-transport = { path = "crates/pyre-transport" }
 
 thiserror = { version = "2.0.12" }
 color-eyre = "0.6.3"
@@ -46,12 +50,19 @@ futures-util = "0.3.31"
 
 async-trait = { version = "0.1.88" }
 
+axum = { version = "0.8.3", default-features = false }
+
 serde = { version = "1.0.219", features = ["derive"] }
 chrono = { version = "0.4.40", features = ["serde"] }
 strum = { version = "0.27.1", features = ["derive"] }
 bitflags = { version = "2.9.0", features = ["serde"] }
 toml = "0.8.20"
 termion = "4.0.5"
+
+rustls = { version = "0.23.26", default-features = false, features = [
+    "ring",
+    "std",
+] }
 
 vergen-git2 = { version = "1.0.2", features = [
     "build",
