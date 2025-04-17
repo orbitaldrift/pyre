@@ -1,7 +1,6 @@
 RED='\033[0;31m'
 RESET='\033[0m'
 
-# Rust fmt.
 check_fmt () {
     if ! cargo +nightly fmt -- --check; then
         echo -e "${RED}Commit error!${RESET}"

@@ -16,10 +16,6 @@ where
     AC: H3Acceptor,
     F: Future<Output = ()>,
 {
-    let svc = tower::ServiceBuilder::new()
-        //.add_extension(Arc::new(ConnInfo { addr, certificates }))
-        .service(svc);
-
     // TODO: tonic body is wrapped? Is it for error to status conversion?
     // use tower::ServiceExt;
     // let h_svc =
@@ -31,20 +27,21 @@ where
 
     let mut sig = std::pin::pin!(signal);
     tracing::debug!("loop start");
+
     loop {
         tracing::debug!("loop");
-        // get the next stream to run http on
+
         let conn = tokio::select! {
-            res = acceptor.accept() =>{
-                match res{
-                Ok(x) => x,
-                Err(e) => {
-                    tracing::error!("accept error : {e}");
-                    return Err(e);
+            res = acceptor.accept() => {
+                match res {
+                    Ok(x) => x,
+                    Err(e) => {
+                        tracing::error!("accept error : {e}");
+                        return Err(e);
+                    }
                 }
             }
-            }
-            _ = &mut sig =>{
+            () = &mut sig =>{
                 tracing::debug!("cancellation triggered");
                 return Ok(());
             }
@@ -67,16 +64,15 @@ where
             loop {
                 let (request, stream) = match conn.accept().await {
                     Ok(req) => {
-                        match req {
-                            Some(r) => r,
-                            None => {
-                                tracing::debug!("server connection ended:");
-                                break;
-                            }
+                        if let Some(r) = req {
+                            r
+                        } else {
+                            tracing::debug!("server connection ended:");
+                            break;
                         }
                     }
                     Err(e) => {
-                        tracing::error!("server connection accept failed: {}", e);
+                        tracing::warn!("server connection accept failed: {}", e);
                         break;
                     }
                 };
@@ -114,30 +110,25 @@ where
     <BD as Body>::Error: Into<crate::Error> + std::error::Error + Send + Sync,
     <BD as Body>::Data: Send + Sync,
 {
-    tracing::debug!("serving request");
-    let (parts, _) = request.into_parts();
+    let (parts, ()) = request.into_parts();
     let (mut w, r) = stream.split();
 
-    let req = Request::from_parts(parts, H3IncomingServer::new(r));
-    tracing::debug!("serving request call service");
-    let res = service.call(req).await?;
+    let request = Request::from_parts(parts, H3IncomingServer::new(r));
 
-    let (res_h, res_b) = res.into_parts();
+    let response = service.call(request).await?;
+    let (res_h, res_b) = response.into_parts();
 
-    // write header
-    tracing::debug!("serving request write header");
     w.send_response(Response::from_parts(res_h, ())).await?;
 
-    // write body or trailer.
     crate::body::server::send_h3_server_body::<BD, AC::BS>(&mut w, res_b).await?;
 
-    tracing::debug!("serving request end");
     Ok(())
 }
 
 pub struct H3Router(axum::Router);
 
 impl H3Router {
+    #[must_use]
     pub fn new(inner: axum::Router) -> Self {
         Self(inner)
     }
@@ -151,6 +142,9 @@ impl From<axum::Router> for H3Router {
 
 impl H3Router {
     /// Runs the service on acceptor until shutdown.
+    ///
+    /// # Errors
+    /// If the acceptor fails to accept a connection.
     pub async fn serve_with_shutdown<AC, F>(
         self,
         acceptor: AC,
@@ -164,14 +158,14 @@ impl H3Router {
     }
 
     /// Runs all services on acceptor
+    ///
+    /// # Errors
+    /// If the acceptor fails to accept a connection.
     pub async fn serve<AC>(self, acceptor: AC) -> Result<(), crate::Error>
     where
         AC: H3Acceptor,
     {
-        self.serve_with_shutdown(acceptor, async {
-            // never returns
-            futures::future::pending().await
-        })
-        .await
+        self.serve_with_shutdown(acceptor, async { futures::future::pending::<()>().await })
+            .await
     }
 }

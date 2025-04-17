@@ -1,4 +1,5 @@
 use hyper::body::Bytes;
+use tokio::task::JoinSet;
 
 use crate::stream::server::H3Acceptor;
 
@@ -10,15 +11,12 @@ async fn select_conn2(
 
     let incoming_stream_future = async {
         tracing::debug!("endpoint waiting accept");
-        match incoming.accept().await {
-            Some(i) => {
-                tracing::debug!("endpoint accept incoming conn");
-                SelectOutputConn2::NewIncoming(i)
-            }
-            None => {
-                tracing::debug!("endpoint accept done");
-                SelectOutputConn2::Done
-            }
+        if let Some(i) = incoming.accept().await {
+            tracing::debug!("endpoint accept incoming conn");
+            SelectOutputConn2::NewIncoming(i)
+        } else {
+            tracing::debug!("endpoint accept done");
+            SelectOutputConn2::Done
         }
     };
     if tasks.is_empty() {
@@ -56,10 +54,11 @@ pub struct H3QuinnAcceptor {
 }
 
 impl H3QuinnAcceptor {
+    #[must_use]
     pub fn new(ep: h3_quinn::Endpoint) -> Self {
         Self {
             ep,
-            tasks: Default::default(),
+            tasks: JoinSet::default(),
         }
     }
 }
@@ -80,7 +79,7 @@ impl H3Acceptor for H3QuinnAcceptor {
                     self.tasks.spawn(async move {
                         let conn = incoming.await.inspect_err(|e| tracing::error!("{:?}", e))?;
                         let conn = h3_quinn::Connection::new(conn);
-                        tracing::debug!("New incoming conn.");
+                        tracing::debug!("incoming conn");
                         Ok(conn)
                     });
                 }
@@ -88,8 +87,7 @@ impl H3Acceptor for H3QuinnAcceptor {
                     return Ok(Some(connection));
                 }
                 SelectOutputConn2::ConnErr(error) => {
-                    // continue on error
-                    tracing::debug!("conn error, ignore: {}", error);
+                    tracing::debug!(%error, "conn error");
                 }
                 SelectOutputConn2::Done => {
                     return Ok(None);

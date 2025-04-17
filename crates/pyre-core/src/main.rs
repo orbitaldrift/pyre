@@ -1,25 +1,34 @@
-use std::{net::SocketAddr, path::PathBuf, process::exit, sync::Arc};
+use std::{path::PathBuf, process::exit, sync::Arc, time::Duration};
 
-use axum::{extract::Request, http::Response, routing::get, Router};
+use axum::{http::HeaderName, routing::get};
 use color_eyre::eyre::Context;
 use config::Config;
-use futures::pin_mut;
-use hyper::body::Incoming;
-use hyper_util::rt::{TokioExecutor, TokioIo};
+use csrf::CsrfLayer;
 use pyre_build::build_info;
 use pyre_cli::shutdown::Shutdown;
-use pyre_crypto::{PkiCert, TlsServerConfig};
+use pyre_crypto::PkiCert;
 use pyre_fs::toml::FromToml;
 use pyre_telemetry::{Info, Telemetry};
-use pyre_transport::{stream::quinn::server::H3QuinnAcceptor, svc::axum::H3Router};
-use rustls::pki_types::{CertificateDer, PrivateKeyDer};
-use tokio::{net::TcpListener, task::JoinHandle};
-use tokio_rustls::TlsAcceptor;
-use tower_service::Service;
-use tracing::{error, info};
+use tower::ServiceBuilder;
+use tower_http::{
+    add_extension::AddExtensionLayer,
+    catch_panic::CatchPanicLayer,
+    compression::CompressionLayer,
+    cors::{Any, CorsLayer},
+    decompression::DecompressionLayer,
+    limit::RequestBodyLimitLayer,
+    metrics::{in_flight_requests::InFlightRequestsCounter, InFlightRequestsLayer},
+    request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer},
+    timeout::TimeoutLayer,
+    trace::{DefaultMakeSpan, DefaultOnFailure, TraceLayer},
+};
+use tracing::{error, Level};
 use uuid::Uuid;
 
 mod config;
+mod csrf;
+mod error;
+mod server;
 
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
@@ -28,17 +37,22 @@ async fn root() -> &'static str {
     "Hello, World from axum!"
 }
 
+struct State {}
+
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> color_eyre::Result<()> {
-    // Metrics middleware
-    // Span context propagator
-    // Security headers layer
-    // CORS layer
-    // Rate limit layer
-    // Session layer
-    // zstd Compression layer
-    // Timeout layer
-    // Request ID layer
+    // Auth Layer PGSQL-SQLX + Sesssion RedisStore + Integrate with CSRF - Discord
+
+    // DB
+    // Graphql
+    // Pooling, retries
+    // Strong input validation around invariants
+    // MTG card scheduled download, versioning
+    // Cache layer for pg, card's data
+    // WebTransport for any streaming
+    // grafana tanka, ingress, grafana stack, terraform k8s cluster
+    // k8s cluster pod resource monitoring
+    // e2e tests, unit tests
 
     build_info!();
     color_eyre::install()?;
@@ -51,7 +65,7 @@ async fn main() -> color_eyre::Result<()> {
         (cfg, _) = Config::from_toml_path::<PathBuf>(None)
             .await
             .unwrap_or_else(|e| {
-                error!("failed to load config: {e}");
+                error!(%e, "failed to load config");
                 exit(1)
             });
 
@@ -65,158 +79,72 @@ async fn main() -> color_eyre::Result<()> {
         )
         .init()
         .inspect_err(|e| {
-            error!("failed to initialize telemetry: {e}");
+            error!(%e, "failed to initialize telemetry");
             exit(1)
         })
         .expect("failed to initialize telemetry");
     }
 
+    let dir = std::env::current_dir().unwrap();
+    println!("Current directory: {:?}", dir);
+    tokio::fs::read(cfg.server.cert.clone()).await.unwrap();
+
     let shutdown = Shutdown::new_with_all_signals().install();
-
-    let addr: SocketAddr = cfg.server.addr.parse()?;
-
-    let cert = CertificateDer::from(
-        tokio::fs::read(cfg.server.cert.clone())
+    let pki = PkiCert::from_bytes(
+        tokio::fs::read(&cfg.server.cert)
             .await
             .context("cert not found")?,
-    );
-    let key = PrivateKeyDer::try_from(
-        tokio::fs::read(cfg.server.key.clone())
+        tokio::fs::read(&cfg.server.key)
             .await
             .context("key not found")?,
-    )
-    .expect("failed to load private key");
-    let pki = PkiCert { cert, key };
+    )?;
+    let x_request_id = HeaderName::from_static("x-request-id");
 
-    let h2 = start_h2(
-        addr,
-        Arc::new(
-            TlsServerConfig::new(
-                &pki,
-                vec![b"http1.1".to_vec(), b"h2".to_vec(), b"h3".to_vec()],
-            )?
-            .into(),
-        ),
-        axum::Router::new()
-            .route("/", get(root))
-            .layer(axum::middleware::map_response(move |res| {
-                set_header(res, addr.port())
-            })),
-        shutdown.subscribe(),
-    )
-    .await?;
+    let state = State {};
 
-    let h3 = start_h3(
-        addr,
-        Arc::new(TlsServerConfig::new(&pki, vec![b"h3".to_vec()])?.into()),
-        axum::Router::new().route("/", get(root)),
-        shutdown.subscribe(),
-    )
-    .await?;
+    let csrf_secret = "secret".as_bytes().to_vec();
 
-    tokio::select! {
-        _ = h3 => {
-            info!("http3 server exited");
-        }
-        _ = h2 => {
-            info!("http2 server exited");
-        }
-    }
+    let middlewares = ServiceBuilder::new()
+        .layer(TimeoutLayer::new(Duration::from_secs(cfg.server.timeout)))
+        .layer(CatchPanicLayer::new())
+        .layer(tower::limit::ConcurrencyLimitLayer::new(
+            cfg.server.max_conns,
+        ))
+        .layer(InFlightRequestsLayer::new(InFlightRequestsCounter::new()))
+        .layer(SetRequestIdLayer::new(
+            x_request_id.clone(),
+            MakeRequestUuid,
+        ))
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(
+                    DefaultMakeSpan::new()
+                        .level(Level::INFO)
+                        .include_headers(true),
+                )
+                .on_failure(DefaultOnFailure::new().level(Level::ERROR)),
+        )
+        .layer(AddExtensionLayer::new(Arc::new(state)))
+        .layer(RequestBodyLimitLayer::new(cfg.server.max_body))
+        .layer(
+            CorsLayer::new()
+                .allow_origin(cfg.server.origins)
+                .allow_methods(Any)
+                .allow_headers(Any),
+        )
+        .layer(CsrfLayer::new(csrf_secret))
+        .layer(CompressionLayer::new())
+        .layer(PropagateRequestIdLayer::new(x_request_id))
+        .layer(DecompressionLayer::new());
+
+    let router = axum::Router::new().route("/", get(root)).layer(middlewares);
+
+    let http = server::Http::new(cfg.server.addr, pki, router, shutdown.subscribe())
+        .with_http2()
+        .await?
+        .with_http3()?;
+
+    http.join_set.join_all().await;
+
     Ok(())
-}
-
-async fn start_h2(
-    addr: SocketAddr,
-    tls: Arc<rustls::ServerConfig>,
-    router: Router,
-    mut shutdown: tokio::sync::broadcast::Receiver<()>,
-) -> color_eyre::Result<JoinHandle<()>> {
-    let tls_acceptor = TlsAcceptor::from(tls);
-    let tcp_listener = TcpListener::bind(addr).await?;
-
-    info!("http2 listening on {}", tcp_listener.local_addr()?);
-
-    Ok(tokio::spawn(async move {
-        pin_mut!(tcp_listener);
-
-        loop {
-            let router = router.clone();
-            let tls_acceptor = tls_acceptor.clone();
-
-            tokio::select! {
-                _ = shutdown.recv() => {
-                    info!("http2 server shutting down");
-                    break;
-                }
-                acc = tcp_listener.accept() => {
-                    match acc {
-                        Ok((cnx, addr)) => {
-                            info!("accepting connection from {}", addr);
-
-                            tokio::spawn(async move {
-                                let Ok(stream) = tls_acceptor.accept(cnx).await else {
-                                    error!("error during tls handshake connection from {}", addr);
-                                    return;
-                                };
-
-                                let stream = TokioIo::new(stream);
-
-                                let hyper_service =
-                                    hyper::service::service_fn(move |request: Request<Incoming>| {
-                                        router.clone().call(request)
-                                    });
-
-                                let ret = hyper_util::server::conn::auto::Builder::new(TokioExecutor::new())
-                                    .serve_connection_with_upgrades(stream, hyper_service)
-                                    .await;
-
-                                if let Err(err) = ret {
-                                    error!("error serving connection from {}: {}", addr, err);
-                                }
-                            });
-                        }
-                        Err(e) => {
-                            error!("error accepting connection: {}", e);
-                            continue;
-                        }
-                    }
-                }
-            }
-        }
-    }))
-}
-
-async fn start_h3(
-    addr: SocketAddr,
-    tls: Arc<rustls::ServerConfig>,
-    router: Router,
-    mut shutdown: tokio::sync::broadcast::Receiver<()>,
-) -> color_eyre::Result<JoinHandle<()>> {
-    let server_config = quinn::ServerConfig::with_crypto(Arc::new(
-        quinn::crypto::rustls::QuicServerConfig::try_from(tls.clone()).unwrap(),
-    ));
-    let server = quinn::Endpoint::server(server_config, addr).unwrap();
-    let listen_addr = server.local_addr().unwrap();
-
-    let acceptor = H3QuinnAcceptor::new(server);
-
-    info!("http3 listening on {}", listen_addr);
-
-    Ok(tokio::spawn(async move {
-        H3Router::new(router)
-            .serve_with_shutdown(acceptor, async move {
-                let _ = shutdown.recv().await;
-                info!("http3 server shutting down");
-            })
-            .await
-            .unwrap();
-    }))
-}
-
-async fn set_header<B>(mut response: Response<B>, port: u16) -> Response<B> {
-    response.headers_mut().insert(
-        "Alt-Svc",
-        format!("h3=\":{port}\"; ma=86400").parse().unwrap(),
-    );
-    response
 }
