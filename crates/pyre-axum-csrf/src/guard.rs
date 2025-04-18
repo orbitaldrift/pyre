@@ -9,7 +9,7 @@ use tower_cookies::Cookies;
 use tower_layer::Layer;
 use tower_service::Service;
 
-use crate::csrf::{token::validate_token, Config, Error};
+use crate::{error::Error, token::validate_token, Config};
 
 #[derive(Clone, Default)]
 pub struct Guard;
@@ -76,25 +76,23 @@ where
 
             let config = match config.ok_or(Error::ExtensionNotFound("Config".into())) {
                 Ok(config) => config,
-                Err(err) => return Error::make_layer_error(err),
+                Err(err) => return Ok(Error::make_layer_error(err)),
             };
 
             let cookies = match cookies.ok_or(Error::ExtensionNotFound("Cookies".into())) {
                 Ok(cookies) => cookies,
-                Err(err) => return Error::make_layer_error(err),
+                Err(err) => return Ok(Error::make_layer_error(err)),
             };
 
-            let cookie_value = match cookies
+            let Some(cookie_value) = cookies
                 .get(&config.cookie_name())
                 .map(|c| c.value().to_owned())
-            {
-                Some(value) => value,
-                None => return Error::make_layer_forbidden(),
+            else {
+                return Ok(Error::make_layer_forbidden());
             };
 
-            let header_value = match header_value {
-                Some(value) => value,
-                None => return Error::make_layer_forbidden(),
+            let Some(header_value) = header_value else {
+                return Ok(Error::make_layer_forbidden());
             };
 
             match validate_token(&config.secret, &cookie_value, &header_value) {
@@ -102,10 +100,10 @@ where
                     if valid {
                         Ok(response)
                     } else {
-                        Error::make_layer_forbidden()
+                        Ok(Error::make_layer_forbidden())
                     }
                 }
-                Err(err) => Error::make_layer_error(err),
+                Err(err) => Ok(Error::make_layer_error(err)),
             }
         })
     }

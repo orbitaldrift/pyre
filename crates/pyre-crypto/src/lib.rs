@@ -1,3 +1,7 @@
+use kdf::Kdf;
+
+pub mod kdf;
+
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("invalid pem key: {0}")]
@@ -39,11 +43,47 @@ pub struct PkiCert {
 }
 
 impl PkiCert {
+    /// Creates a new `PkiCert` from the given certificate and private key.
+    /// The certificate and key should be in DER format. Preferably Pkcs8.
+    ///
+    /// # Errors
+    /// Fails if the key is invalid, not Pkcs or Sec1.
     pub fn from_bytes(cert: Vec<u8>, key: Vec<u8>) -> Result<Self, Error> {
         let cert = rustls::pki_types::CertificateDer::from(cert);
         let key = rustls::pki_types::PrivateKeyDer::try_from(key)
             .map_err(|e| Error::InvalidKey(e.to_string()))?;
 
         Ok(PkiCert { cert, key })
+    }
+
+    #[must_use]
+    /// Derives a key from the given password and salt using the Scrypt KDF.
+    ///
+    /// # Panics
+    /// Panics if the key derivation fails on invalid output length.
+    pub fn derive_key(&self, salt: Vec<u8>) -> [u8; 64] {
+        let kdf = kdf::scrypt::ScryptKdf::secure_with_salt(salt);
+        let mut out = [0u8; 64];
+
+        kdf.derive_key(self.key.secret_der(), &mut out)
+            .expect("failed to derive key");
+
+        out
+    }
+
+    #[must_use]
+    /// WARNING! Unsafe to use in production.
+    /// Derives a key from the given password and salt using the Scrypt KDF.
+    ///
+    /// # Panics
+    /// Panics if the key derivation fails on invalid output length.
+    pub fn derive_key_fast(&self) -> [u8; 64] {
+        let kdf = kdf::scrypt::ScryptKdf::fast(rand::thread_rng());
+        let mut out = [0u8; 64];
+
+        kdf.derive_key(self.key.secret_der(), &mut out)
+            .expect("failed to derive key");
+
+        out
     }
 }

@@ -16,6 +16,10 @@ categories = ["web-programming"]
 [dependencies]
 thiserror = { workspace = true }
 tracing = { workspace = true }
-
-rcgen = "0.13.2"
 rustls = { workspace = true }
+
+const-hex = "1.14.0"
+rand_core = "0.6.4"
+scrypt = "0.11.0"
+rcgen = "0.13.2"
+rand = "0.8.5"

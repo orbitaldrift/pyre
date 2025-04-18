@@ -2,15 +2,24 @@
 addr = "127.0.0.1:4433"
 cert = "etc/localhost/local.cert"
 key = "etc/localhost/local.key"
+
+[http]
 timeout = 10
 max_conns = 512
 max_body = 4096
 origins = ["localhost:4433"]
 
+[session]
+session_days = 7
+
+[db]
+redis = "redis://localhost:6379"
+pg = "postgres://postgres:postgres@localhost:5432/postgres"
+
 [telemetry]
 domain = "odrift"
 mode = { Stdout = {} }
 layers = ""
-filter = "info"
+filter = "tower_sessions=warn,axum_login=warn,info"
 interval = 10
 temporality = { Cumulative = {} }

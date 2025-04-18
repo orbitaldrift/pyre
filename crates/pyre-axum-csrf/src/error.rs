@@ -17,21 +17,18 @@ pub enum Error {
 }
 
 impl Error {
-    pub(crate) fn make_layer_error<T: Default, E>(
-        err: impl std::error::Error,
-    ) -> Result<http::Response<T>, E> {
+    pub(crate) fn make_layer_error<T: Default>(err: impl std::error::Error) -> http::Response<T> {
         tracing::error!(err = %err);
 
         let mut response = http::Response::default();
         *response.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
 
-        Ok(response)
+        response
     }
 
-    pub(crate) fn make_layer_forbidden<T: Default, E>() -> Result<http::Response<T>, E> {
+    pub(crate) fn make_layer_forbidden<T: Default>() -> http::Response<T> {
         let mut response = http::Response::default();
         *response.status_mut() = StatusCode::FORBIDDEN;
-
-        Ok(response)
+        response
     }
 }

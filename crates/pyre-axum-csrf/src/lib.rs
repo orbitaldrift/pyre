@@ -3,9 +3,12 @@ use std::{
     task::{Context, Poll},
 };
 
+use error::Error;
 use futures_util::future::BoxFuture;
+use guard::GuardService;
 use http::{HeaderValue, Request, Response};
 use secstr::SecStr;
+use token::Token;
 use tower_cookies::{
     cookie::{Expiration, SameSite},
     CookieManager,
@@ -14,13 +17,12 @@ use tower_cookies::{
 use tower_layer::Layer;
 use tower_service::Service;
 
-use crate::csrf::{error::Error, guard::GuardService, token::Token};
-
 mod error;
 mod extract;
 mod guard;
 mod token;
 
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Clone)]
 pub(crate) struct Config {
     pub(crate) secret: SecStr,
@@ -57,6 +59,7 @@ pub struct CsrfLayer {
 
 impl CsrfLayer {
     /// Creates a new [`Csrf`] layer with the provided secret and default token configuration.
+    #[must_use]
     pub fn new(secret: Vec<u8>) -> Self {
         Self {
             config: Config {
@@ -76,6 +79,7 @@ impl CsrfLayer {
 
     /// Sets the cookie name. Note that this will be previed with `__HOST-` unless
     /// you have disabled it with [prefix](`CsrfLayer::prefix`). The default value is `csrf_token`.
+    #[must_use]
     pub fn cookie_name(mut self, cookie_name: impl Into<String>) -> Self {
         self.config.cookie_name = cookie_name.into();
 
@@ -83,6 +87,7 @@ impl CsrfLayer {
     }
 
     /// Sets the cookie's expiration. The default value is `Expiration::Session`.
+    #[must_use]
     pub fn expires(mut self, expires: Expiration) -> Self {
         self.config.expires = expires;
 
@@ -91,6 +96,7 @@ impl CsrfLayer {
 
     /// Sets the header name used when validating the request. The default
     /// value is `X-CSRF-Token`.
+    #[must_use]
     pub fn header_name(mut self, header_name: impl Into<String>) -> Self {
         self.config.header_name = header_name.into();
 
@@ -100,6 +106,7 @@ impl CsrfLayer {
     /// Sets whether to send the `Strict-Transport-Security` header.
     ///
     /// See: [HTTP Strict Transport Security Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/HTTP_Strict_Transport_Security_Cheat_Sheet.html)
+    #[must_use]
     pub fn hsts(mut self, hsts: bool) -> Self {
         self.config.hsts = hsts;
 
@@ -110,6 +117,7 @@ impl CsrfLayer {
     ///
     /// ⚠️ **Warning**: This should generally _not_ be set to false.
     /// See: [HttpOnly Cookie Attribute](https://owasp.org/www-community/HttpOnly).
+    #[must_use]
     pub fn http_only(mut self, http_only: bool) -> Self {
         self.config.http_only = http_only;
 
@@ -120,6 +128,7 @@ impl CsrfLayer {
     /// value is `true`.
     ///
     /// See: [Cookie Name](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Set-Cookie#cookie-namecookie-value).
+    #[must_use]
     pub fn prefix(mut self, prefix: bool) -> Self {
         self.config.prefix = prefix;
 
@@ -129,6 +138,7 @@ impl CsrfLayer {
     /// Sets whether to append the [hsts](`CsrfLayer::hsts`) header with `preload`.
     ///
     /// See: [HTTP Strict Transport Security Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/HTTP_Strict_Transport_Security_Cheat_Sheet.html)
+    #[must_use]
     pub fn preload(mut self, preload: bool) -> Self {
         self.config.preload = preload;
 
@@ -138,6 +148,7 @@ impl CsrfLayer {
     /// Sets the `SameSite` attribute of the cookie. The default value is [`SameSite::Strict`].
     ///
     /// See: [SameSite Cookie Attribute](https://owasp.org/www-community/SameSite).
+    #[must_use]
     pub fn same_site(mut self, same_site: SameSite) -> Self {
         self.config.same_site = same_site;
 
@@ -148,6 +159,7 @@ impl CsrfLayer {
     /// be `false` for cookies to work on `localhost`. The default value is `true`.
     ///
     /// See: [Secure Cookie Attribute](https://owasp.org/www-community/controls/SecureCookieAttribute).
+    #[must_use]
     pub fn secure(mut self, secure: bool) -> Self {
         self.config.secure = secure;
 
@@ -194,7 +206,7 @@ where
             .ok_or(Error::ExtensionNotFound("Cookies".into()))
         {
             Ok(cookies) => cookies,
-            Err(err) => return Box::pin(async move { Error::make_layer_error(err) }),
+            Err(err) => return Box::pin(async move { Ok(Error::make_layer_error(err)) }),
         };
 
         let token = Token {
@@ -204,7 +216,7 @@ where
 
         if cookies.get(&self.config.cookie_name()).is_none() {
             if let Err(err) = token.create() {
-                return Box::pin(async move { Error::make_layer_error(err) });
+                return Box::pin(async move { Ok(Error::make_layer_error(err)) });
             }
         }
 
@@ -227,7 +239,7 @@ where
 
                 let value = match HeaderValue::from_str(&value) {
                     Ok(value) => value,
-                    Err(err) => return Error::make_layer_error(err),
+                    Err(err) => return Ok(Error::make_layer_error(err)),
                 };
 
                 response

@@ -14,6 +14,12 @@ pub struct Error<T: AppError> {
     pub source: T,
 }
 
+impl<T: AppError> Error<T> {
+    pub fn new(source: T) -> Self {
+        Self { source }
+    }
+}
+
 impl<T> IntoResponse for Error<T>
 where
     T: AppError,
@@ -51,7 +57,11 @@ where
             }
         }
 
-        let body = if status.is_server_error() { "Internal server error".to_string() } else { format!("{}", self.source) };
+        let body = if status.is_server_error() {
+            "Internal server error".to_string()
+        } else {
+            format!("{}", self.source)
+        };
 
         (status, body).into_response()
     }
