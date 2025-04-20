@@ -1,34 +1,49 @@
 #![allow(dead_code)]
 
-use std::{path::PathBuf, process::exit, sync::Arc};
+use std::{net::SocketAddr, path::PathBuf, process::exit};
 
-use axum::routing::get;
+use auth::session::SessionBackend;
+use axum::{response::IntoResponse, routing::get, Router};
+use axum_login::{login_required, AuthSession};
 use color_eyre::eyre::Context;
 use config::Config;
-use error::Error;
+use garde::Validate;
 use pyre_build::build_info;
 use pyre_cli::shutdown::Shutdown;
 use pyre_crypto::PkiCert;
 use pyre_fs::toml::FromToml;
 use pyre_telemetry::{Info, Telemetry};
-use svc::{add_middlewares, state::AppState};
-use tracing::{error, info};
+use svc::{router_with_middlewares, state::AppState};
+use tracing::error;
 use uuid::Uuid;
+
 mod auth;
 mod config;
+mod db;
 mod error;
 mod svc;
 
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
-async fn protect() -> &'static str {
-    "Protected"
+async fn protect(auth_session: AuthSession<SessionBackend>) -> impl IntoResponse {
+    match auth_session.user {
+        Some(user) => {
+            let user = user.clone();
+            format!("Hello, {}!", user.name)
+        }
+        None => "Unauthorized".to_string(),
+    }
+}
+
+async fn root() -> impl IntoResponse {
+    "Hello"
 }
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> color_eyre::Result<()> {
-    // Prepare Auth Backend + Integrate with CSRF - Discord as OAuth
+    // CSRF layer integrate with Session Layer for automatic session ID and verifications
+    // Captcha layer turnstile
 
     // Graphql
     // Strong input validation around invariants
@@ -54,6 +69,11 @@ async fn main() -> color_eyre::Result<()> {
                 exit(1)
             });
 
+        cfg.validate().unwrap_or_else(|e| {
+            error!(%e, "failed to validate config");
+            exit(1)
+        });
+
         Telemetry::new(
             &cfg.telemetry,
             Info {
@@ -70,8 +90,6 @@ async fn main() -> color_eyre::Result<()> {
         .expect("failed to initialize telemetry");
     }
 
-    info!(%cfg, "initializing");
-
     let shutdown = Shutdown::new_with_all_signals().install();
     let pki = PkiCert::from_bytes(
         tokio::fs::read(&cfg.server.cert)
@@ -82,24 +100,27 @@ async fn main() -> color_eyre::Result<()> {
             .context("key not found")?,
     )?;
 
-    let state = Arc::new(AppState::new(cfg.db.clone()).await?);
+    let state = AppState::new(cfg.clone()).await?;
+    let addr: SocketAddr = cfg.server.addr.parse()?;
 
-    info!("deriving app secret");
-    // TODO fetch salt from pg
-    // if no salt, generate a new one and derive key with that salt
-    // TODO change to secure derivation if env is prod
-    let secret = pki.derive_key_fast();
+    let router = Router::new()
+        .route("/protected", get(protect))
+        .route_layer(login_required!(
+            SessionBackend,
+            login_url = "/oauth2/discord"
+        ))
+        .route(
+            "/oauth2/discord",
+            get(auth::provider::discord::auth_discord),
+        )
+        .route(
+            "/oauth2/discord/auth",
+            get(auth::provider::discord::auth_discord_auth),
+        )
+        .route("/login", get(auth::login))
+        .route("/", get(root));
 
-    let addr = cfg.server.addr;
-    let router = add_middlewares(
-        state.clone(),
-        axum::Router::new()
-            .route("/login", get(svc::auth::login))
-            .route("/protected", get(protect)),
-        cfg,
-        secret,
-    )
-    .await?;
+    let router = router_with_middlewares(router, state.clone(), cfg).await?;
 
     let http = svc::server::Http::new(addr, pki, router, shutdown.subscribe())
         .with_http2()

@@ -9,68 +9,50 @@ use axum_login::{
     tower_sessions::{Expiry, SessionManagerLayer},
     AuthManagerLayerBuilder,
 };
+use garde::Validate;
 use pyre_axum_csrf::CsrfLayer;
+use serde::{Deserialize, Serialize};
 use state::AppState;
 use time::Duration;
 use tower::ServiceBuilder;
 use tower_http::{
-    add_extension::AddExtensionLayer,
     catch_panic::CatchPanicLayer,
     compression::CompressionLayer,
     cors::{Any, CorsLayer},
     decompression::DecompressionLayer,
     limit::RequestBodyLimitLayer,
     metrics::{in_flight_requests::InFlightRequestsCounter, InFlightRequestsLayer},
-    request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer},
+    request_id::{MakeRequestUuid, PropagateRequestIdLayer, RequestId, SetRequestIdLayer},
     timeout::TimeoutLayer,
-    trace::{DefaultOnFailure, TraceLayer},
+    trace::TraceLayer,
 };
 use tower_sessions::cookie::Key;
 use tower_sessions_redis_store::RedisStore;
-use tracing::{info, Level, Span};
-use uuid::Uuid;
+use tracing::{info, Span};
 
-use crate::{auth::backend::Backend, config::Config, error::AppError};
+use crate::{auth::session::SessionBackend, config::Config};
 
-pub mod auth;
 pub mod server;
 pub mod state;
 
 pub const X_REQUEST_ID: HeaderName = HeaderName::from_static("x-request-id");
 
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-    #[error("unauth")]
-    Unauthorized(Uuid),
-    #[error("err")]
-    InternalErr(Uuid),
-
-    #[error("bad request id")]
-    BadId,
+#[derive(Validate, Debug, Clone, Serialize, Deserialize)]
+pub struct SessionConfig {
+    #[garde(range(min = 1, max = 30))]
+    pub session_days: i64,
 }
 
-impl AppError for Error {
-    fn id(&self) -> Uuid {
-        match self {
-            Error::InternalErr(uuid) | Error::Unauthorized(uuid) => *uuid,
-            Error::BadId => Uuid::new_v4(),
-        }
-    }
-
-    fn status_code(&self) -> hyper::StatusCode {
-        match self {
-            Error::InternalErr(_) => hyper::StatusCode::INTERNAL_SERVER_ERROR,
-            Error::Unauthorized(_) => hyper::StatusCode::UNAUTHORIZED,
-            Error::BadId => hyper::StatusCode::BAD_REQUEST,
-        }
+impl Default for SessionConfig {
+    fn default() -> Self {
+        Self { session_days: 7 }
     }
 }
 
-pub async fn add_middlewares(
-    state: Arc<AppState>,
-    router: Router,
+pub async fn router_with_middlewares(
+    router: Router<AppState>,
+    state: AppState,
     cfg: Config,
-    secret: [u8; 64],
 ) -> color_eyre::Result<Router> {
     info!("creating middlewares");
 
@@ -79,9 +61,9 @@ pub async fn add_middlewares(
         .with_expiry(Expiry::OnInactivity(Duration::days(
             cfg.session.session_days,
         )))
-        .with_signed(Key::from(&secret));
+        .with_signed(Key::from(state.secret.clone().unsecure()));
 
-    let backend = Backend::default();
+    let backend = SessionBackend::new(Arc::new(state.clone()));
     let auth_layer = AuthManagerLayerBuilder::new(backend, session_layer).build();
 
     let middlewares = ServiceBuilder::new()
@@ -92,13 +74,8 @@ pub async fn add_middlewares(
         .layer(tower::limit::ConcurrencyLimitLayer::new(cfg.http.max_conns))
         .layer(InFlightRequestsLayer::new(InFlightRequestsCounter::new()))
         .layer(SetRequestIdLayer::new(X_REQUEST_ID, MakeRequestUuid))
-        .layer(AddExtensionLayer::new(state))
         .layer(RequestBodyLimitLayer::new(cfg.http.max_body))
-        .layer(
-            TraceLayer::new_for_http()
-                .make_span_with(make_span_with_redacted_headers)
-                .on_failure(DefaultOnFailure::new().level(Level::ERROR)),
-        )
+        .layer(TraceLayer::new_for_http().make_span_with(make_span))
         .layer(
             CorsLayer::new()
                 .allow_origin(cfg.http.origins)
@@ -106,12 +83,12 @@ pub async fn add_middlewares(
                 .allow_headers(Any),
         )
         .layer(auth_layer)
-        .layer(CsrfLayer::new(secret.to_vec()))
+        .layer(CsrfLayer::new(state.secret.clone().unsecure().to_vec()))
         .layer(CompressionLayer::new())
         .layer(PropagateRequestIdLayer::new(X_REQUEST_ID))
         .layer(DecompressionLayer::new());
 
-    Ok(router.layer(middlewares))
+    Ok(router.layer(middlewares).with_state(state))
 }
 
 fn get_sensitive_headers() -> HashSet<HeaderName> {
@@ -123,11 +100,19 @@ fn get_sensitive_headers() -> HashSet<HeaderName> {
     sensitive
 }
 
-// Create a custom make_span function that redacts sensitive headers
-fn make_span_with_redacted_headers<B>(request: &Request<B>) -> Span {
+fn make_span<B>(request: &Request<B>) -> Span {
+    let request_id = request
+        .extensions()
+        .get::<RequestId>()
+        .expect("RequestId not found in request extensions, not set by middleware");
+
+    let request_id = request_id
+        .header_value()
+        .to_str()
+        .expect("request id header value not a string");
+
     let sensitive_headers = get_sensitive_headers();
 
-    // Create a version of the headers with sensitive values redacted
     let mut redacted_headers = request.headers().clone();
     for name in &sensitive_headers {
         if redacted_headers.contains_key(name) {
@@ -135,10 +120,21 @@ fn make_span_with_redacted_headers<B>(request: &Request<B>) -> Span {
         }
     }
 
+    // Ellipse the request URI if it's too long
+    let req_uri = {
+        let uri = request.uri().to_string();
+        if uri.len() > 100 {
+            format!("{}...{}", &uri[..45], &uri[uri.len() - 45..])
+        } else {
+            uri
+        }
+    };
+
     tracing::info_span!(
         "request",
+        id = %request_id,
         method = %request.method(),
-        uri = %request.uri(),
+        uri = %req_uri,
         version = ?request.version(),
         headers = ?redacted_headers,
     )

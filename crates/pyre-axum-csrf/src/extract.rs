@@ -1,9 +1,9 @@
 use axum_core::extract::FromRequestParts;
 use http::{request::Parts, StatusCode};
 
-use crate::{error::Error, token::Token};
+use crate::{error::Error, token::CsrfToken};
 
-impl<S> FromRequestParts<S> for Token
+impl<S> FromRequestParts<S> for CsrfToken
 where
     S: Send + Sync,
 {
@@ -12,9 +12,9 @@ where
     async fn from_request_parts(parts: &mut Parts, _: &S) -> Result<Self, Self::Rejection> {
         parts
             .extensions
-            .get::<Token>()
+            .get::<CsrfToken>()
             .cloned()
-            .ok_or(Error::ExtensionNotFound("Token".into()))
+            .ok_or(Error::ExtensionNotFound("CsrfToken".into()))
             .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))
     }
 }

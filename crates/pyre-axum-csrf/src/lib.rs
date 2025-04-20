@@ -8,7 +8,7 @@ use futures_util::future::BoxFuture;
 use guard::GuardService;
 use http::{HeaderValue, Request, Response};
 use secstr::SecStr;
-use token::Token;
+use token::CsrfToken;
 use tower_cookies::{
     cookie::{Expiration, SameSite},
     CookieManager,
@@ -17,10 +17,10 @@ use tower_cookies::{
 use tower_layer::Layer;
 use tower_service::Service;
 
-mod error;
-mod extract;
-mod guard;
-mod token;
+pub mod error;
+pub mod extract;
+pub mod guard;
+pub mod token;
 
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Clone)]
@@ -209,7 +209,7 @@ where
             Err(err) => return Box::pin(async move { Ok(Error::make_layer_error(err)) }),
         };
 
-        let token = Token {
+        let token = CsrfToken {
             config: self.config.clone(),
             cookies: cookies.clone(),
         };

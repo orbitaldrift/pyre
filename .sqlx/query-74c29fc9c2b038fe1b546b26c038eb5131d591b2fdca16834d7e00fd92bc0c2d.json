@@ -1,0 +1,83 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT \n                p.id, \n                p.user_id, \n                p.external_id, \n                p.kind AS \"provider_kind!: ProviderKind\", \n                p.username, \n                p.created_at, \n                NULL AS \"avatar?: String\", \n                NULL AS \"email?: String\"\n            FROM providers p\n            WHERE p.kind = $1 AND p.external_id = $2\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "user_id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 2,
+        "name": "external_id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "provider_kind!: ProviderKind",
+        "type_info": {
+          "Custom": {
+            "name": "provider_kind",
+            "kind": {
+              "Enum": [
+                "discord"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "username",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 6,
+        "name": "avatar?: String",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "email?: String",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        {
+          "Custom": {
+            "name": "provider_kind",
+            "kind": {
+              "Enum": [
+                "discord"
+              ]
+            }
+          }
+        },
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      null,
+      null
+    ]
+  },
+  "hash": "74c29fc9c2b038fe1b546b26c038eb5131d591b2fdca16834d7e00fd92bc0c2d"
+}

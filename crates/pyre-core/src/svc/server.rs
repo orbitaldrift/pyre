@@ -1,15 +1,59 @@
 use std::{net::SocketAddr, sync::Arc};
 
-use axum::{body::Body, response::Response, Router};
+use axum::{body::Body, http::HeaderValue, response::Response, Router};
 use futures::pin_mut;
+use garde::Validate;
 use hyper::{body::Incoming, Request};
 use hyper_util::rt::{TokioExecutor, TokioIo};
 use pyre_crypto::{PkiCert, TlsServerConfig};
 use pyre_transport::{stream::quinn::server::H3QuinnAcceptor, svc::axum::H3Router};
+use serde::{Deserialize, Serialize};
 use tokio::net::{TcpListener, TcpStream};
 use tokio_rustls::TlsAcceptor;
 use tower::Service;
+use tower_http::cors::AllowOrigin;
 use tracing::{error, info};
+
+#[derive(Validate, Debug, Clone, Serialize, Deserialize)]
+pub struct HttpConfig {
+    #[garde(range(min = 3, max = 15))]
+    pub timeout: u64,
+    #[garde(range(min = 1, max = 512))]
+    pub max_conns: usize,
+    #[garde(range(min = 512, max = 1_000_000))] // Max is 1mb
+    pub max_body: usize,
+    #[garde(dive)]
+    pub origins: Origins,
+}
+
+impl Default for HttpConfig {
+    fn default() -> Self {
+        Self {
+            timeout: 10,
+            max_conns: 512,
+            max_body: 4096,
+            origins: Origins(vec!["*".to_string()]),
+        }
+    }
+}
+
+#[derive(Validate, Debug, Clone, Default, Serialize, Deserialize)]
+pub struct Origins(#[garde(length(min = 1), inner(ascii, length(min = 1)))] pub Vec<String>);
+
+impl From<Origins> for AllowOrigin {
+    fn from(origins: Origins) -> Self {
+        let origins = origins
+            .0
+            .into_iter()
+            .map(|origin| {
+                HeaderValue::from_str(&origin)
+                    .unwrap_or_else(|_| panic!("Invalid origin header value: {origin}"))
+            })
+            .collect::<Vec<_>>();
+
+        AllowOrigin::list(origins)
+    }
+}
 
 pub struct Http {
     addr: SocketAddr,

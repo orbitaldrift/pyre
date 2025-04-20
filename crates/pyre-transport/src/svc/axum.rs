@@ -16,13 +16,6 @@ where
     AC: H3Acceptor,
     F: Future<Output = ()>,
 {
-    // TODO: tonic body is wrapped? Is it for error to status conversion?
-    // use tower::ServiceExt;
-    // let h_svc =
-    //     hyper_util::service::TowerToHyperService::new(svc.map_request(|req: http::Request<_>| {
-    //         req.map(tonic::body::boxed::<crate::H3IncomingServer<AC::RS, Bytes>>)
-    //     }));
-
     let h_svc = hyper_util::service::TowerToHyperService::new(svc);
 
     let mut sig = std::pin::pin!(signal);

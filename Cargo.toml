@@ -61,6 +61,8 @@ bitflags = { version = "2.9.0", features = ["serde"] }
 toml = "0.8.20"
 termion = "4.0.5"
 rand = "0.9.1"
+secstr = "0.5.1"
+const-hex = "1.14.0"
 
 rustls = { version = "0.23.26", default-features = false, features = [
     "ring",
@@ -72,4 +74,12 @@ vergen-git2 = { version = "1.0.2", features = [
     "cargo",
     "rustc",
     "si",
+] }
+
+garde = { version = "0.22.0", features = [
+    "derive",
+    "email",
+    "regex",
+    "serde",
+    "url",
 ] }

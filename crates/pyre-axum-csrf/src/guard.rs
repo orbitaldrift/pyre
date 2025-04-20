@@ -49,6 +49,9 @@ where
     }
 
     fn call(&mut self, request: Request<Q>) -> Self::Future {
+        // If GET, try to validate the token
+        // If no token, try to generate one with session ext.
+
         if ![Method::POST, Method::PUT, Method::PATCH, Method::DELETE].contains(request.method()) {
             return Box::pin(self.inner.call(request));
         }

@@ -14,12 +14,9 @@ keywords = ["web", "api"]
 categories = ["web-programming"]
 
 [dependencies]
-pyre-telemetry = { workspace = true }
-
 thiserror = { workspace = true }
 tracing = { workspace = true }
 tokio = { workspace = true }
-tokio-util = { workspace = true }
 serde = { workspace = true }
 toml = { workspace = true }
 

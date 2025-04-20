@@ -12,12 +12,12 @@ use crate::{error::Error, Config};
 /// An extension providing a way to interact with a visitor's
 /// CSRF token.
 #[derive(Clone)]
-pub struct Token {
+pub struct CsrfToken {
     pub(crate) config: Arc<Config>,
     pub(crate) cookies: Cookies,
 }
 
-impl Token {
+impl CsrfToken {
     pub(crate) fn create(&self) -> Result<(), Error> {
         let identifier: i128 = rand::rng().random();
         let token = create_token(&self.config.secret, identifier.to_string())?;

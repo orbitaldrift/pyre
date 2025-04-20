@@ -1,15 +1,21 @@
 use std::{fmt::Display, time::Duration};
 
 use bitflags::bitflags;
+use garde::Validate;
 use opentelemetry_otlp::ExportConfig;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Validate, Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
+    #[garde(skip)]
     pub mode: Mode,
+    #[garde(ascii)]
     pub layers: String,
+    #[garde(ascii, length(min = 1))]
     pub filter: String,
+    #[garde(range(min = 5, max = 60))]
     pub interval: u64,
+    #[garde(skip)]
     pub temporality: Temporality,
 }
 

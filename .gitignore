@@ -9,3 +9,6 @@ target/
 
 # Environment
 .env
+
+# Secrets
+.*.key

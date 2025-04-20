@@ -2,6 +2,7 @@
 addr = "127.0.0.1:4433"
 cert = "etc/localhost/local.cert"
 key = "etc/localhost/local.key"
+secret = ".master.key"
 
 [http]
 timeout = 10
@@ -14,7 +15,7 @@ session_days = 7
 
 [db]
 redis = "redis://localhost:6379"
-pg = "postgres://postgres:postgres@localhost:5432/postgres"
+pg = "postgres://postgres:postgres@localhost:5432/pyre"
 
 [telemetry]
 domain = "odrift"
@@ -23,3 +24,14 @@ layers = ""
 filter = "tower_sessions=warn,axum_login=warn,info"
 interval = 10
 temporality = { Cumulative = {} }
+
+[discord]
+client_id = "1363014531705471097"
+client_secret = ".discord.key"
+auth_url = "https://discord.com/api/oauth2/authorize"
+token_url = "https://discord.com/api/oauth2/token"
+redirect_url = "https://localhost:4433/oauth2/discord/auth"
+scopes = ["identify", "email"]
+
+[reqwest]
+timeout = 5
