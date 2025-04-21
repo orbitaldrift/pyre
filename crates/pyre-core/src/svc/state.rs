@@ -10,7 +10,10 @@ use tower_sessions_redis_store::fred::{
 use tracing::info;
 
 use crate::{
-    auth::provider::{self, ConfiguredClient, ProviderKind},
+    auth::{
+        self,
+        provider::{ConfiguredClient, ProviderKind},
+    },
     config::Config,
 };
 
@@ -72,7 +75,7 @@ impl AppState {
         let mut oauth2_clients = HashMap::new();
         oauth2_clients.insert(
             ProviderKind::Discord,
-            Arc::new(provider::discord::new_client(config.discord.clone()).await),
+            Arc::new(auth::provider::discord::new_client(config.discord.clone()).await),
         );
 
         let http_client = reqwest::Client::builder()

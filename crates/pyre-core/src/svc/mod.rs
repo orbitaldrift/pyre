@@ -61,7 +61,7 @@ pub async fn router_with_middlewares(
         .with_expiry(Expiry::OnInactivity(Duration::days(
             cfg.session.session_days,
         )))
-        .with_signed(Key::from(state.secret.clone().unsecure()));
+        .with_signed(Key::from(state.secret.unsecure()));
 
     let backend = SessionBackend::new(Arc::new(state.clone()));
     let auth_layer = AuthManagerLayerBuilder::new(backend, session_layer).build();

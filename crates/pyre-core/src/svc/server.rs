@@ -5,7 +5,7 @@ use futures::pin_mut;
 use garde::Validate;
 use hyper::{body::Incoming, Request};
 use hyper_util::rt::{TokioExecutor, TokioIo};
-use pyre_crypto::{PkiCert, TlsServerConfig};
+use pyre_crypto::tls::{PkiCert, TlsServerConfig};
 use pyre_transport::{stream::quinn::server::H3QuinnAcceptor, svc::axum::H3Router};
 use serde::{Deserialize, Serialize};
 use tokio::net::{TcpListener, TcpStream};

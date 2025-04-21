@@ -9,7 +9,7 @@ use tower_cookies::Cookies;
 use tower_layer::Layer;
 use tower_service::Service;
 
-use crate::{error::Error, token::validate_token, Config};
+use crate::{error::Error, token::CsrfToken, Config};
 
 #[derive(Clone, Default)]
 pub struct Guard;
@@ -49,16 +49,9 @@ where
     }
 
     fn call(&mut self, request: Request<Q>) -> Self::Future {
-        // If GET, try to validate the token
-        // If no token, try to generate one with session ext.
-
         if ![Method::POST, Method::PUT, Method::PATCH, Method::DELETE].contains(request.method()) {
             return Box::pin(self.inner.call(request));
         }
-
-        // TODO: if no cookies, and no session, use random UUID
-        // if cookies, session ext, then use session id
-        // this will remove need for calling .set manually.
 
         let config = request.extensions().get::<Arc<Config>>().cloned();
         let cookies = request.extensions().get::<Cookies>().cloned();
@@ -98,7 +91,9 @@ where
                 return Ok(Error::make_layer_forbidden());
             };
 
-            match validate_token(&config.secret, &cookie_value, &header_value) {
+            let csrf_token = CsrfToken(cookie_value);
+
+            match csrf_token.validate(&config.secret, &header_value) {
                 Ok(valid) => {
                     if valid {
                         Ok(response)

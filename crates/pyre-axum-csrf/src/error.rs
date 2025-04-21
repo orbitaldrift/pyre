@@ -4,7 +4,7 @@ use http::StatusCode;
 pub enum Error {
     /// Maps the [`hmac::digest::InvalidLength`] error.
     #[error(transparent)]
-    InvalidLength(#[from] hmac::digest::InvalidLength),
+    InvalidLength(#[from] pyre_crypto::hmac::Error),
     /// Maps the [`http::header::InvalidHeaderValue`] error.
     #[error(transparent)]
     InvalidHeaderValue(#[from] http::header::InvalidHeaderValue),

@@ -10,7 +10,7 @@ use config::Config;
 use garde::Validate;
 use pyre_build::build_info;
 use pyre_cli::shutdown::Shutdown;
-use pyre_crypto::PkiCert;
+use pyre_crypto::tls::PkiCert;
 use pyre_fs::toml::FromToml;
 use pyre_telemetry::{Info, Telemetry};
 use svc::{router_with_middlewares, state::AppState};
@@ -42,7 +42,6 @@ async fn root() -> impl IntoResponse {
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> color_eyre::Result<()> {
-    // CSRF layer integrate with Session Layer for automatic session ID and verifications
     // Captcha layer turnstile
 
     // Graphql
@@ -109,14 +108,8 @@ async fn main() -> color_eyre::Result<()> {
             SessionBackend,
             login_url = "/oauth2/discord"
         ))
-        .route(
-            "/oauth2/discord",
-            get(auth::provider::discord::auth_discord),
-        )
-        .route(
-            "/oauth2/discord/auth",
-            get(auth::provider::discord::auth_discord_auth),
-        )
+        .route("/oauth2/discord", get(auth::provider::discord::redirect))
+        .route("/oauth2/discord/auth", get(auth::provider::discord::auth))
         .route("/login", get(auth::login))
         .route("/", get(root));
 

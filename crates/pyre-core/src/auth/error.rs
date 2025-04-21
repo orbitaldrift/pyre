@@ -9,6 +9,11 @@ pub enum Error {
     Database(#[from] crate::db::Error),
     #[error(transparent)]
     Session(#[from] axum_login::tower_sessions::session::Error),
+    #[error(transparent)]
+    Csrf(#[from] pyre_axum_csrf::error::Error),
+
+    #[error("invalid oauth csrf")]
+    InvalidOAuthCsrf,
 
     #[error("failed to get oauth2 client: {0}")]
     ProviderNotFound(String),
@@ -23,9 +28,6 @@ pub enum Error {
 
     #[error("existing user attempted to login with wrong provider")]
     UserExists,
-
-    #[error("failed to get csrf token: {0}")]
-    CsrfNotSet(String),
 
     #[error("unauthorized")]
     Unauthorized,
@@ -48,7 +50,8 @@ impl AppError for Error {
             | Error::DiscordBody(_)
             | Error::InvalidProvider(_)
             | Error::ProviderNotFound(_)
-            | Error::CsrfNotSet(_)
+            | Error::Csrf(_)
+            | Error::InvalidOAuthCsrf
             | Error::UserExists => hyper::StatusCode::BAD_REQUEST,
             Error::Unauthorized => hyper::StatusCode::UNAUTHORIZED,
             Error::Session(_) | Error::Database(_) => hyper::StatusCode::INTERNAL_SERVER_ERROR,

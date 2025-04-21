@@ -3,10 +3,12 @@ use std::{
     task::{Context, Poll},
 };
 
+use cookie::CsrfCookie;
 use error::Error;
 use futures_util::future::BoxFuture;
 use guard::GuardService;
 use http::{HeaderValue, Request, Response};
+use rand::Rng;
 use secstr::SecStr;
 use token::CsrfToken;
 use tower_cookies::{
@@ -17,6 +19,7 @@ use tower_cookies::{
 use tower_layer::Layer;
 use tower_service::Service;
 
+pub mod cookie;
 pub mod error;
 pub mod extract;
 pub mod guard;
@@ -27,6 +30,7 @@ pub mod token;
 pub(crate) struct Config {
     pub(crate) secret: SecStr,
     pub(crate) cookie_name: String,
+    pub(crate) session_id_cookie_name: String,
     pub(crate) expires: Expiration,
     pub(crate) header_name: String,
     pub(crate) hsts: bool,
@@ -38,6 +42,22 @@ pub(crate) struct Config {
 }
 
 impl Config {
+    pub fn default_with_secret(secret: Vec<u8>) -> Self {
+        Config {
+            secret: SecStr::new(secret),
+            cookie_name: "csrf_token".into(),
+            session_id_cookie_name: "id".into(),
+            expires: Expiration::Session,
+            header_name: "X-CSRF-Token".into(),
+            hsts: true,
+            http_only: true,
+            prefix: true,
+            preload: false,
+            same_site: SameSite::Strict,
+            secure: true,
+        }
+    }
+
     pub(crate) fn cookie_name(&self) -> String {
         if self.prefix {
             format!("__HOST-{}", self.cookie_name)
@@ -62,18 +82,7 @@ impl CsrfLayer {
     #[must_use]
     pub fn new(secret: Vec<u8>) -> Self {
         Self {
-            config: Config {
-                secret: SecStr::new(secret),
-                cookie_name: "csrf_token".into(),
-                expires: Expiration::Session,
-                header_name: "X-CSRF-Token".into(),
-                hsts: true,
-                http_only: true,
-                prefix: true,
-                preload: false,
-                same_site: SameSite::Strict,
-                secure: true,
-            },
+            config: Config::default_with_secret(secret),
         }
     }
 
@@ -82,6 +91,15 @@ impl CsrfLayer {
     #[must_use]
     pub fn cookie_name(mut self, cookie_name: impl Into<String>) -> Self {
         self.config.cookie_name = cookie_name.into();
+
+        self
+    }
+
+    /// Sets the session ID cookie name. This is used to identify the session
+    /// for the current visitor. The default value is `id`.
+    #[must_use]
+    pub fn session_id_cookie_name(mut self, cookie_name: impl Into<String>) -> Self {
+        self.config.session_id_cookie_name = cookie_name.into();
 
         self
     }
@@ -209,19 +227,30 @@ where
             Err(err) => return Box::pin(async move { Ok(Error::make_layer_error(err)) }),
         };
 
-        let token = CsrfToken {
-            config: self.config.clone(),
-            cookies: cookies.clone(),
+        // Either get cookie with specified name for the session id, or generate random identifier
+        let identifier: String = match cookies.get(self.config.session_id_cookie_name.as_str()) {
+            Some(cookie) => {
+                println!("session cookie found");
+                match cookie.value().parse::<String>() {
+                    Ok(id) => id,
+                    Err(err) => return Box::pin(async move { Ok(Error::make_layer_error(err)) }),
+                }
+            }
+            None => rand::rng().random::<u128>().to_string(),
         };
 
+        let csrf_token = match CsrfToken::new(&self.config.secret, identifier) {
+            Ok(token) => token,
+            Err(err) => return Box::pin(async move { Ok(Error::make_layer_error(err)) }),
+        };
+        let csrf_cookie = CsrfCookie::new(self.config.clone(), cookies.clone());
+
         if cookies.get(&self.config.cookie_name()).is_none() {
-            if let Err(err) = token.create() {
-                return Box::pin(async move { Ok(Error::make_layer_error(err)) });
-            }
+            csrf_cookie.create(&csrf_token);
         }
 
         request.extensions_mut().insert(self.config.clone());
-        request.extensions_mut().insert(token);
+        request.extensions_mut().insert(csrf_cookie);
 
         let config = self.config.clone();
 

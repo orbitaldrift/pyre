@@ -2222,6 +2222,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "pem"
+version = "3.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "38af38e8470ac9dee3ce1bae1af9c1671fffc44ddfd8bd1d0a3445bf349a8ef3"
+dependencies = [
+ "base64",
+ "serde",
+]
+
+[[package]]
 name = "pem-rfc7468"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2382,11 +2392,10 @@ dependencies = [
  "base64",
  "color-eyre",
  "futures-util",
- "hmac",
  "http",
+ "pyre-crypto",
  "rand 0.9.1",
  "secstr",
- "sha2",
  "subtle",
  "thiserror 2.0.12",
  "tower-cookies",
@@ -2469,11 +2478,16 @@ dependencies = [
 name = "pyre-crypto"
 version = "0.1.0"
 dependencies = [
+ "base64",
  "const-hex",
+ "hmac",
  "rand 0.8.5",
  "rand_core 0.6.4",
+ "rcgen",
  "rustls",
  "scrypt",
+ "secstr",
+ "sha2",
  "thiserror 2.0.12",
 ]
 
@@ -2666,6 +2680,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d25bf25ec5ae4a3f1b92f929810509a2f53d7dca2f50b794ff57e3face536c8f"
 dependencies = [
  "rand_core 0.6.4",
+]
+
+[[package]]
+name = "rcgen"
+version = "0.13.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "75e669e5202259b5314d1ea5397316ad400819437857b90861765f24c4cf80a2"
+dependencies = [
+ "pem",
+ "ring",
+ "rustls-pki-types",
+ "time",
+ "yasna",
 ]
 
 [[package]]
@@ -4738,6 +4765,15 @@ name = "writeable"
 version = "0.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e9df38ee2d2c3c5948ea468a8406ff0db0b29ae1ffde1bcf20ef305bcc95c51"
+
+[[package]]
+name = "yasna"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e17bb3549cc1321ae1296b9cdc2698e2b6cb1992adfa19a8c72e5b7a738f44cd"
+dependencies = [
+ "time",
+]
 
 [[package]]
 name = "yoke"

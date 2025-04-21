@@ -23,3 +23,15 @@ impl FileReadExt for PathBuf {
         Ok(buf)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_read_all() {
+        let path = PathBuf::from("Cargo.toml");
+        let contents = path.read_all().await.unwrap();
+        assert!(!contents.is_empty());
+    }
+}

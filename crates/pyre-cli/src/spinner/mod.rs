@@ -99,3 +99,15 @@ impl Suspendable for Spinner {
         self.spinner.suspend(f)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_spinner() {
+        let spinner = Spinner::new(10, "Loading...", &SpinnerTemplate::Default);
+        assert_eq!(spinner.current_step, 1);
+        assert_eq!(spinner.total_steps, 10);
+    }
+}
