@@ -5,8 +5,8 @@ use axum::{
 use axum_login::AuthSession;
 use garde::Validate;
 use oauth2::{basic::BasicClient, AuthUrl, ClientId, ClientSecret, RedirectUrl, Scope, TokenUrl};
-use pyre_axum_csrf::{cookie::CsrfCookie, token::CsrfToken};
 use serde::{Deserialize, Serialize};
+use tower_sessions::Session;
 use tracing::warn;
 
 use crate::{
@@ -14,6 +14,7 @@ use crate::{
         error::Error,
         provider::{ConfiguredClient, Provider, ProviderKind},
         session::SessionBackend,
+        CSRF_SESSION_KEY,
     },
     svc::state::AppState,
 };
@@ -101,18 +102,15 @@ pub async fn new_client(cfg: Config) -> ConfiguredClient {
 }
 
 pub async fn redirect(
-    token: CsrfCookie,
+    session: Session,
     State(state): State<AppState>,
 ) -> Result<impl IntoResponse, Error> {
-    let csrf = token.get()?;
+    let csrf = oauth2::CsrfToken::new_random();
 
-    // TODO: catpcha verify as middleware layer, verification happens automatic from cookies or headers in layer
-    // Create Extractor, make a separate crate for pyre-axum-captcha
-
-    let (auth_url, _csrf_token) = state
+    let (auth_url, csrf) = state
         .get_oauth_client(ProviderKind::Discord)
         .map_err(Error::ProviderNotFound)?
-        .authorize_url(|| oauth2::CsrfToken::new((*csrf).clone()))
+        .authorize_url(|| csrf)
         .add_scopes(
             state
                 .config
@@ -123,23 +121,29 @@ pub async fn redirect(
         )
         .url();
 
+    session.insert(CSRF_SESSION_KEY, csrf.secret()).await?;
+
     Ok(Redirect::to(auth_url.as_ref()))
 }
 
 #[axum::debug_handler]
 pub async fn auth(
-    session: AuthSession<SessionBackend>,
+    auth_session: AuthSession<SessionBackend>,
+    session: Session,
     Query(query): Query<DiscordCallback>,
     State(state): State<AppState>,
 ) -> Result<impl IntoResponse, Error> {
-    if !CsrfToken::validate_signature_only(&state.secret, &query.state)? {
-        warn!("invalid CSRF token");
-        return Err(Error::InvalidOAuthCsrf);
-    }
+    let csrf = session.get::<String>(CSRF_SESSION_KEY).await?.unwrap();
+    csrf.as_bytes()
+        .eq(query.state.as_bytes())
+        .then(|| {
+            warn!("CSRF token mismatch");
+        })
+        .ok_or(Error::InvalidOAuthCsrf)?;
 
     Provider::new_from_discord(&state, query.code)
         .await?
-        .authenticate(session, state)
+        .authenticate(auth_session, state)
         .await?;
 
     Ok(Redirect::to("/"))

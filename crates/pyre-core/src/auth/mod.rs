@@ -12,6 +12,8 @@ pub mod provider;
 pub mod session;
 pub mod user;
 
+pub const CSRF_SESSION_KEY: &str = "csrf";
+
 pub async fn login(
     mut auth_session: AuthSession<SessionBackend>,
     Form(creds): Form<Credentials>,

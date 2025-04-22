@@ -1,4 +1,4 @@
-use base64::{prelude::BASE64_STANDARD, Engine};
+use base64::Engine;
 use hmac::{Hmac, Mac};
 use secstr::SecStr;
 use sha2::Sha256;
@@ -24,15 +24,16 @@ impl<'a> Base64Hmac<'a> {
     ///
     /// # Errors
     /// If the key length is invalid, an `Error::InvalidKeyLength` error is returned.
-    pub fn sign(&self, message: &[u8]) -> Result<String, Error> {
+    pub fn sign(&self, base64_engine: &impl Engine, message: &[u8]) -> Result<String, Error> {
         let mut mac = Hmac::<Sha256>::new_from_slice(self.key.unsecure())?;
         mac.update(message);
-        Ok(BASE64_STANDARD.encode(mac.finalize().into_bytes()))
+        Ok(base64_engine.encode(mac.finalize().into_bytes()))
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use base64::prelude::BASE64_URL_SAFE_NO_PAD;
     use secstr::SecStr;
 
     use super::*;
@@ -42,8 +43,8 @@ mod tests {
         let key = SecStr::from("my_secret_key");
         let message = b"my_message";
         let hmac = Base64Hmac::new(&key);
-        let signature = hmac.sign(message).unwrap();
-        let expected_signature = "3RKWN4LEX0xGcIvKbVPJYx0r+9U7DghtdlErOMuHFb4=";
+        let signature = hmac.sign(&BASE64_URL_SAFE_NO_PAD, message).unwrap();
+        let expected_signature = "3RKWN4LEX0xGcIvKbVPJYx0r-9U7DghtdlErOMuHFb4";
         assert_eq!(signature, expected_signature);
     }
 }

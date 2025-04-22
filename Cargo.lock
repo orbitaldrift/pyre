@@ -2385,26 +2385,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "pyre-axum-csrf"
-version = "0.1.0"
-dependencies = [
- "axum-core 0.5.2",
- "base64",
- "color-eyre",
- "futures-util",
- "http",
- "pyre-crypto",
- "rand 0.9.1",
- "secstr",
- "subtle",
- "thiserror 2.0.12",
- "tower-cookies",
- "tower-layer",
- "tower-service",
- "tracing",
-]
-
-[[package]]
 name = "pyre-build"
 version = "0.1.0"
 dependencies = [
@@ -2444,7 +2424,6 @@ dependencies = [
  "hyper-util",
  "oauth2",
  "once_cell",
- "pyre-axum-csrf",
  "pyre-build",
  "pyre-cli",
  "pyre-crypto",
@@ -2488,6 +2467,7 @@ dependencies = [
  "scrypt",
  "secstr",
  "sha2",
+ "subtle",
  "thiserror 2.0.12",
 ]
 

@@ -85,14 +85,23 @@ impl AppState {
             .http2_prior_knowledge()
             .build()?;
 
-        let secret = tokio::fs::read(config.server.secret.clone())
-            .await
-            .unwrap_or_else(|_| {
-                panic!(
-                    "failed to read secret from {}",
-                    config.server.secret.display()
-                )
-            });
+        let secret = const_hex::decode(
+            tokio::fs::read(config.server.secret.clone())
+                .await
+                .unwrap_or_else(|_| {
+                    panic!(
+                        "failed to read secret from {}",
+                        config.server.secret.display()
+                    )
+                }),
+        )
+        .unwrap_or_else(|e| {
+            panic!(
+                "failed to decode secret from {} - not hex? {:?}",
+                config.server.secret.display(),
+                e
+            )
+        });
 
         assert_eq!(secret.len(), 64, "secret must be 64 bytes");
 

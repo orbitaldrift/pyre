@@ -1,6 +1,5 @@
 [workspace]
 members = [
-    "crates/pyre-axum-csrf",
     "crates/pyre-build",
     "crates/pyre-core",
     "crates/pyre-cli",
@@ -20,7 +19,6 @@ codegen-units = 1
 panic = "abort"
 
 [workspace.dependencies]
-pyre-axum-csrf = { path = "crates/pyre-axum-csrf" }
 pyre-build = { path = "crates/pyre-build" }
 pyre-cli = { path = "crates/pyre-cli" }
 pyre-crypto = { path = "crates/pyre-crypto" }

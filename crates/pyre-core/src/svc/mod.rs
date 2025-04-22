@@ -10,7 +10,6 @@ use axum_login::{
     AuthManagerLayerBuilder,
 };
 use garde::Validate;
-use pyre_axum_csrf::CsrfLayer;
 use serde::{Deserialize, Serialize};
 use state::AppState;
 use time::Duration;
@@ -61,6 +60,8 @@ pub async fn router_with_middlewares(
         .with_expiry(Expiry::OnInactivity(Duration::days(
             cfg.session.session_days,
         )))
+        .with_same_site(tower_sessions::cookie::SameSite::Lax)
+        .with_always_save(true)
         .with_signed(Key::from(state.secret.unsecure()));
 
     let backend = SessionBackend::new(Arc::new(state.clone()));
@@ -79,11 +80,14 @@ pub async fn router_with_middlewares(
         .layer(
             CorsLayer::new()
                 .allow_origin(cfg.http.origins)
-                .allow_methods(Any)
+                .allow_methods(vec![
+                    axum::http::Method::GET,
+                    axum::http::Method::HEAD,
+                    axum::http::Method::OPTIONS,
+                ])
                 .allow_headers(Any),
         )
         .layer(auth_layer)
-        .layer(CsrfLayer::new(state.secret.clone().unsecure().to_vec()))
         .layer(CompressionLayer::new())
         .layer(PropagateRequestIdLayer::new(X_REQUEST_ID))
         .layer(DecompressionLayer::new());

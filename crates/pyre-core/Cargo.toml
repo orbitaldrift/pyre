@@ -14,7 +14,6 @@ keywords = ["web", "api"]
 categories = ["web-programming"]
 
 [dependencies]
-pyre-axum-csrf = { workspace = true }
 pyre-build = { workspace = true }
 pyre-cli = { workspace = true }
 pyre-crypto = { workspace = true }

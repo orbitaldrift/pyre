@@ -1,3 +1,5 @@
-mod telemetry "crates/pyre-telemetry/justfile"
-mod docker
-mod db
+mod telemetry "etc/telemetry.just"
+mod docker "etc/docker.just"
+mod db "etc/db.just"
+mod keys "etc/keys.just"
+mod deploy "etc/deploy.just"

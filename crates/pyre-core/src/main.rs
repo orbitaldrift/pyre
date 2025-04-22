@@ -42,7 +42,8 @@ async fn root() -> impl IntoResponse {
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> color_eyre::Result<()> {
-    // Captcha layer turnstile
+    // Governor axum for rate limiting per IP
+    // E2E test with mock server and H3 client request, try to get auth code from discord api
 
     // Graphql
     // Strong input validation around invariants
