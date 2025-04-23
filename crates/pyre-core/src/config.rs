@@ -45,6 +45,8 @@ pub struct ServerConfig {
     #[garde(skip)]
     pub key: PathBuf,
     #[garde(skip)]
+    pub test_cert: bool,
+    #[garde(skip)]
     pub secret: PathBuf,
 }
 
@@ -54,7 +56,8 @@ impl Default for ServerConfig {
             addr: "127.0.0.1:4433".parse().unwrap(),
             cert: "etc/localhost/local.cert".into(),
             key: "etc/localhost/local.key".into(),
-            secret: ".master.key".into(),
+            test_cert: true,
+            secret: "test-master.key".into(),
         }
     }
 }

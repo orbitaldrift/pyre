@@ -159,7 +159,6 @@ impl Provider {
         mut session: AuthSession<SessionBackend>,
         state: AppState,
     ) -> Result<(), Error> {
-        // TODO: move to different fn called login that takes provider and authenticates/logs in.
         if let Some(user) = session
             .authenticate(Credentials {
                 provider: self.clone(),

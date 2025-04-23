@@ -1,9 +1,11 @@
 # Generate a random key for the master key
-master:
-    openssl rand -hex 64 | tr -d '\n' > keys/.master.key
+[no-cd]
+@master PATH="etc/keys/.master.key":
+    touch {{PATH}}
+    openssl rand -hex 64 | tr -d '\n' > {{PATH}}
 
 # Generate and install a local certificate
-cert:
+local-cert:
     mkcert -cert-file local.pem -key-file local-key.pem localhost 127.0.0.1 ::1
     mkcert -install
 

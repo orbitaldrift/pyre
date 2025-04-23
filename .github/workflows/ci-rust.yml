@@ -81,7 +81,24 @@ jobs:
         
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
-      
+
+      - name: Install Just
+        run: cargo install just
+
+      - name: Install sqlx
+        run: cargo install sqlx-cli
+
+      - name: Setup db
+        env:
+          DATABASE_URL: "postgres://postgres:postgres@localhost:5432/pyre"
+        run: |
+          just db run
+          just db
+
+      - name: OAuth2 Discord
+        run: |
+          echo "${{ secrets.DISCORD_SECRET }}" > crates/pyre-core/.discord.key
+
       - name: Generate code coverage
         run: cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
       

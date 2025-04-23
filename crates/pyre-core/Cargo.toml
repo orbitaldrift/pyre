@@ -13,6 +13,8 @@ documentation = "https://docs.odlabs.xyz"
 keywords = ["web", "api"]
 categories = ["web-programming"]
 
+default-run = "pyre-core"
+
 [dependencies]
 pyre-build = { workspace = true }
 pyre-cli = { workspace = true }

@@ -1,3 +1,5 @@
+use rcgen::{generate_simple_self_signed, CertifiedKey};
+
 use crate::kdf::{scrypt::ScryptKdf, Kdf};
 
 #[derive(Debug, thiserror::Error)]
@@ -6,7 +8,10 @@ pub enum Error {
     InvalidKey(String),
 
     #[error("rustls error: {0}")]
-    RustlsError(#[from] rustls::Error),
+    Rustls(#[from] rustls::Error),
+
+    #[error("rcgen error: {0}")]
+    Rcgen(#[from] rcgen::Error),
 }
 
 pub struct TlsServerConfig(pub rustls::ServerConfig);
@@ -54,6 +59,17 @@ impl PkiCert {
         Ok(PkiCert { cert, key })
     }
 
+    /// Creates a new `PkiCert` from a rcgen generated self-signed certificate.
+    ///
+    /// # Errors
+    /// Fails if the key is invalid, not Pkcs or Sec1.
+    pub fn new_self_signed() -> Result<Self, Error> {
+        let CertifiedKey { cert, key_pair } =
+            generate_simple_self_signed(vec!["localhost".to_string()])?;
+
+        Self::from_bytes(cert.der().to_vec(), key_pair.serialize_der())
+    }
+
     #[must_use]
     /// Derives a key from the given password and salt using the Scrypt KDF.
     ///
@@ -89,7 +105,6 @@ impl PkiCert {
 #[cfg(test)]
 mod tests {
     use rand::RngCore;
-    use rcgen::{generate_simple_self_signed, CertifiedKey};
 
     use super::*;
 
@@ -98,10 +113,7 @@ mod tests {
         let mut salt = [0u8; 32];
         rand::thread_rng().fill_bytes(&mut salt);
 
-        let CertifiedKey { cert, key_pair } =
-            generate_simple_self_signed(vec!["localhost".to_string()]).unwrap();
-
-        let pki = PkiCert::from_bytes(cert.der().to_vec(), key_pair.serialize_der()).unwrap();
+        let pki = PkiCert::new_self_signed().unwrap();
         let key = pki.derive_key_fast();
 
         assert_eq!(key.len(), 64);

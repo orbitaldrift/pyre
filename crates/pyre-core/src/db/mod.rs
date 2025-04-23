@@ -1,11 +1,9 @@
+#![allow(dead_code)]
+
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error(transparent)]
     Sqlx(#[from] sqlx::Error),
-}
-
-pub trait Dal {
-    fn acquire(&self) -> Result<sqlx::Pool<sqlx::Postgres>, Error>;
 }
 
 #[async_trait::async_trait]

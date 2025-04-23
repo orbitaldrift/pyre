@@ -58,7 +58,7 @@ impl From<DiscordProvider> for Provider {
 }
 
 #[allow(clippy::ignored_unit_patterns)]
-#[derive(Validate, Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Validate, Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     #[garde(ascii, length(min = 1))]
     pub client_id: String,
@@ -77,6 +77,19 @@ pub struct Config {
 
     #[garde(length(min = 1), inner(ascii, length(min = 1)))]
     pub scopes: Vec<String>,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            client_id: "1363014531705471097".to_string(),
+            client_secret: ".discord.key".to_string(),
+            auth_url: "https://discord.com/api/oauth2/authorize".to_string(),
+            token_url: "https://discord.com/api/oauth2/token".to_string(),
+            redirect_url: "https://127.0.0.1:4433/auth/discord/callback".to_string(),
+            scopes: vec!["identify".to_string(), "email".to_string()],
+        }
+    }
 }
 
 /// Discord `OAuth2` client
