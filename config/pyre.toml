@@ -7,7 +7,9 @@ secret = "etc/keys/.master.key"
 [http]
 timeout = 10
 max_conns = 512
-max_body = 4096
+max_body = 1_000_000
+limiter_period = 2
+limiter_retain_interval = 60
 origins = ["localhost:4433"]
 
 [session]
@@ -21,7 +23,8 @@ pg = "postgres://postgres:postgres@localhost:5432/pyre"
 domain = "odrift"
 mode = { Stdout = {} }
 layers = ""
-filter = "tower_sessions=warn,axum_login=warn,info"
+level = "info"
+filter = ["tower_sessions=warn", "axum_login=warn"]
 interval = 10
 temporality = { Cumulative = {} }
 

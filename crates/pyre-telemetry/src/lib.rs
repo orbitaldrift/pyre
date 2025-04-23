@@ -300,8 +300,10 @@ impl Telemetry {
     }
 
     fn get_filter(&self) -> EnvFilter {
-        EnvFilter::try_from_default_env()
-            .unwrap_or_else(|_| EnvFilter::new(self.config.filter.clone()))
+        let mut filter = self.config.filter.clone();
+        filter.push(self.config.level.clone());
+
+        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(filter.join(",")))
     }
 
     fn default_fmt_layer() -> fmt::Layer<Registry> {

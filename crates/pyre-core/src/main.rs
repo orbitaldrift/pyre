@@ -3,8 +3,13 @@
 use std::{net::SocketAddr, path::PathBuf, process::exit};
 
 use auth::session::SessionBackend;
-use axum::{response::IntoResponse, routing::get, Router};
-use axum_login::{login_required, AuthSession};
+use axum::{
+    extract::ConnectInfo,
+    response::IntoResponse,
+    routing::{get, post},
+    Router,
+};
+use axum_login::login_required;
 use color_eyre::eyre::Context;
 use config::Config;
 use garde::Validate;
@@ -13,8 +18,13 @@ use pyre_cli::shutdown::Shutdown;
 use pyre_crypto::tls::PkiCert;
 use pyre_fs::toml::FromToml;
 use pyre_telemetry::{Info, Telemetry};
-use svc::{router_with_middlewares, state::AppState};
-use tracing::error;
+use svc::{
+    limiter::{self, UserIdKeyExtractor},
+    middleware::router_with_middlewares,
+    state::AppState,
+};
+use tower_governor::GovernorLayer;
+use tracing::{error, info};
 use uuid::Uuid;
 
 mod auth;
@@ -26,23 +36,14 @@ mod svc;
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
-async fn protect(auth_session: AuthSession<SessionBackend>) -> impl IntoResponse {
-    match auth_session.user {
-        Some(user) => {
-            let user = user.clone();
-            format!("Hello, {}!", user.name)
-        }
-        None => "Unauthorized".to_string(),
-    }
-}
+async fn root(connect_info: ConnectInfo<SocketAddr>) -> impl IntoResponse {
+    info!("conn info: {}", connect_info.0);
 
-async fn root() -> impl IntoResponse {
     "Hello"
 }
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> color_eyre::Result<()> {
-    // Governor axum for rate limiting per IP
     // E2E test with mock server and H3 client request, try to get auth code from discord api
 
     // Graphql
@@ -104,15 +105,17 @@ async fn main() -> color_eyre::Result<()> {
     let addr: SocketAddr = cfg.server.addr.parse()?;
 
     let router = Router::new()
-        .route("/protected", get(protect))
+        .route("/me", post(auth::me))
         .route_layer(login_required!(
             SessionBackend,
             login_url = "/oauth2/discord"
         ))
         .route("/oauth2/discord", get(auth::provider::discord::redirect))
         .route("/oauth2/discord/auth", get(auth::provider::discord::auth))
-        .route("/login", get(auth::login))
-        .route("/", get(root));
+        .route("/", get(root))
+        .layer(GovernorLayer {
+            config: limiter::setup(&cfg.http, UserIdKeyExtractor::<SessionBackend>::new()),
+        });
 
     let router = router_with_middlewares(router, state.clone(), cfg).await?;
 

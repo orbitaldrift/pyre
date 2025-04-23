@@ -1,5 +1,6 @@
 use hyper::body::Bytes;
 
+type AcceptResult<Conn, C> = Result<Option<(Conn, C)>, crate::Error>;
 pub trait H3Acceptor {
     type CONN: h3::quic::Connection<
             Bytes,
@@ -19,8 +20,9 @@ pub trait H3Acceptor {
     type BS: h3::quic::BidiStream<Bytes, RecvStream = Self::RS, SendStream = Self::SS>
         + Send
         + 'static;
+    type ConnectInfo: Clone + Send + Sync + 'static;
 
     fn accept(
         &mut self,
-    ) -> impl std::future::Future<Output = Result<Option<Self::CONN>, crate::Error>> + std::marker::Send;
+    ) -> impl std::future::Future<Output = AcceptResult<Self::CONN, Self::ConnectInfo>> + std::marker::Send;
 }

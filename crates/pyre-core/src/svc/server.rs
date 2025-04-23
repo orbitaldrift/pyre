@@ -20,8 +20,12 @@ pub struct HttpConfig {
     pub timeout: u64,
     #[garde(range(min = 1, max = 512))]
     pub max_conns: usize,
-    #[garde(range(min = 512, max = 1_000_000))] // Max is 1mb
+    #[garde(range(min = 4096, max = 1_000_000))] // Max is 1mb
     pub max_body: usize,
+    #[garde(range(min = 1, max = 10))]
+    pub limiter_period: u64,
+    #[garde(range(min = 5, max = 120))]
+    pub limiter_retain_interval: u64,
     #[garde(dive)]
     pub origins: Origins,
 }
@@ -31,7 +35,9 @@ impl Default for HttpConfig {
         Self {
             timeout: 10,
             max_conns: 512,
-            max_body: 4096,
+            max_body: 1_000_000,
+            limiter_period: 2,
+            limiter_retain_interval: 60,
             origins: Origins(vec!["*".to_string()]),
         }
     }
@@ -160,9 +166,12 @@ impl Http {
                 return;
             };
 
+            let mut router = router.into_make_service_with_connect_info::<SocketAddr>();
+            let tower_service = router.call(addr).await.unwrap();
+
             let stream = TokioIo::new(stream);
             let hyper_service = hyper::service::service_fn(move |request: Request<Incoming>| {
-                router.clone().call(request)
+                tower_service.clone().call(request)
             });
 
             let ret = hyper_util::server::conn::auto::Builder::new(TokioExecutor::new())

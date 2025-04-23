@@ -1,9 +1,6 @@
-use axum::{
-    response::{IntoResponse, Redirect},
-    Form,
-};
+use axum::{response::IntoResponse, Json};
 use axum_login::AuthSession;
-use session::{Credentials, SessionBackend};
+use session::SessionBackend;
 
 use crate::auth::error::Error;
 
@@ -14,17 +11,10 @@ pub mod user;
 
 pub const CSRF_SESSION_KEY: &str = "csrf";
 
-pub async fn login(
-    mut auth_session: AuthSession<SessionBackend>,
-    Form(creds): Form<Credentials>,
-) -> Result<impl IntoResponse, Error> {
-    let Ok(Some(user)) = auth_session.authenticate(creds.clone()).await else {
+pub async fn me(auth_session: AuthSession<SessionBackend>) -> Result<impl IntoResponse, Error> {
+    let Some(user) = auth_session.user else {
         return Err(Error::Unauthorized);
     };
 
-    if auth_session.login(&user).await.is_err() {
-        return Err(Error::Unauthorized);
-    }
-
-    Ok(Redirect::to("/protected").into_response())
+    Ok(Json(user).into_response())
 }

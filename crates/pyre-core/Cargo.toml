@@ -92,6 +92,8 @@ tower-sessions = { version = "0.14.0", default-features = false, features = [
     "signed",
 ] }
 tower-sessions-redis-store = "0.16.0"
+tower_governor = { version = "0.7.0", features = ["tracing"] }
+governor = { version = "0.8.1", default-features = false }
 
 tokio-rustls = { version = "0.26.2", features = ["ring"] }
 hyper = { version = "1.6.0", default-features = false, features = ["http2"] }

@@ -1,4 +1,4 @@
-use std::future::Future;
+use std::{future::Future, net::SocketAddr};
 
 use axum::body::Bytes;
 use hyper::{body::Body, Request, Response};
@@ -13,7 +13,7 @@ async fn serve_inner<AC, F>(
     signal: F,
 ) -> Result<(), crate::Error>
 where
-    AC: H3Acceptor,
+    AC: H3Acceptor<ConnectInfo = SocketAddr>,
     F: Future<Output = ()>,
 {
     let h_svc = hyper_util::service::TowerToHyperService::new(svc);
@@ -24,7 +24,7 @@ where
     loop {
         tracing::debug!("loop");
 
-        let conn = tokio::select! {
+        let result = tokio::select! {
             res = acceptor.accept() => {
                 match res {
                     Ok(x) => x,
@@ -40,7 +40,8 @@ where
             }
         };
 
-        let Some(conn) = conn else {
+        // Get connection and connection info
+        let Some((conn, addr)) = result else {
             tracing::debug!("acceptor end of conn");
             return Ok(());
         };
@@ -70,9 +71,15 @@ where
                     }
                 };
                 let h_svc_cp = h_svc_cp.clone();
+                let addr_clone = addr;
                 tokio::spawn(async move {
-                    if let Err(e) =
-                        serve_request::<AC, _, _>(request, stream, h_svc_cp.clone()).await
+                    if let Err(e) = serve_request_with_addr::<AC, _, _>(
+                        request,
+                        stream,
+                        h_svc_cp.clone(),
+                        addr_clone,
+                    )
+                    .await
                     {
                         tracing::error!("server request failed: {}", e);
                     }
@@ -82,16 +89,17 @@ where
     }
 }
 
-async fn serve_request<AC, SVC, BD>(
+async fn serve_request_with_addr<AC, SVC, BD>(
     request: Request<()>,
     stream: h3::server::RequestStream<
         <<AC as H3Acceptor>::CONN as h3::quic::OpenStreams<Bytes>>::BidiStream,
         Bytes,
     >,
     service: SVC,
+    addr: SocketAddr,
 ) -> Result<(), crate::Error>
 where
-    AC: H3Acceptor,
+    AC: H3Acceptor<ConnectInfo = SocketAddr>,
     SVC: hyper::service::Service<
         Request<H3IncomingServer<AC::RS, Bytes>>,
         Response = Response<BD>,
@@ -103,8 +111,11 @@ where
     <BD as Body>::Error: Into<crate::Error> + std::error::Error + Send + Sync,
     <BD as Body>::Data: Send + Sync,
 {
-    let (parts, ()) = request.into_parts();
+    let (mut parts, ()) = request.into_parts();
     let (mut w, r) = stream.split();
+
+    // Add the connection info as an extension
+    parts.extensions.insert(axum::extract::ConnectInfo(addr));
 
     let request = Request::from_parts(parts, H3IncomingServer::new(r));
 
@@ -127,12 +138,6 @@ impl H3Router {
     }
 }
 
-impl From<axum::Router> for H3Router {
-    fn from(value: axum::Router) -> Self {
-        Self::new(value)
-    }
-}
-
 impl H3Router {
     /// Runs the service on acceptor until shutdown.
     ///
@@ -144,21 +149,9 @@ impl H3Router {
         signal: F,
     ) -> Result<(), crate::Error>
     where
-        AC: H3Acceptor,
+        AC: H3Acceptor<ConnectInfo = SocketAddr>,
         F: Future<Output = ()>,
     {
         serve_inner(self.0, acceptor, signal).await
-    }
-
-    /// Runs all services on acceptor
-    ///
-    /// # Errors
-    /// If the acceptor fails to accept a connection.
-    pub async fn serve<AC>(self, acceptor: AC) -> Result<(), crate::Error>
-    where
-        AC: H3Acceptor,
-    {
-        self.serve_with_shutdown(acceptor, async { futures::future::pending::<()>().await })
-            .await
     }
 }

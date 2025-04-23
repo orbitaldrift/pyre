@@ -12,7 +12,9 @@ pub struct Config {
     #[garde(ascii)]
     pub layers: String,
     #[garde(ascii, length(min = 1))]
-    pub filter: String,
+    pub level: String,
+    #[garde(inner(ascii, length(min = 1)))]
+    pub filter: Vec<String>,
     #[garde(range(min = 5, max = 60))]
     pub interval: u64,
     #[garde(skip)]
@@ -23,8 +25,13 @@ impl Display for Config {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{{ mode: {}, layers: {}, filter: {}, interval: {}, temporality: {} }}",
-            self.mode, self.layers, self.filter, self.interval, self.temporality
+            "{{ mode: {}, layers: {}, level: {}, filter: {}, interval: {}, temporality: {} }}",
+            self.mode,
+            self.layers,
+            self.level,
+            self.filter.join(","),
+            self.interval,
+            self.temporality
         )
     }
 }
@@ -33,7 +40,8 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             layers: "metrics".to_string(),
-            filter: "info".to_string(),
+            level: "info".to_string(),
+            filter: vec![],
             interval: 30,
             temporality: Temporality::default(),
             mode: Mode::default(),
