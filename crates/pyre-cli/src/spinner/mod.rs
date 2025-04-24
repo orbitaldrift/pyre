@@ -109,10 +109,10 @@ mod tests {
         assert_eq!(spinner.current_step, 2);
 
         spinner.success("Done");
-        assert_eq!(spinner.inner.is_finished(), true);
+        assert!(spinner.inner.is_finished());
 
         let spinner = Spinner::new(10, "Loading...", &SpinnerTemplate::Default);
         spinner.fail("Failed");
-        assert_eq!(spinner.inner.is_finished(), true);
+        assert!(spinner.inner.is_finished());
     }
 }

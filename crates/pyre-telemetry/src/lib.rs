@@ -48,6 +48,13 @@ pub struct Info {
     pub meta: Option<Vec<KeyValue>>,
 }
 
+pub type LayerStack<S, T> = (
+    EnvFilter,
+    Option<OpenTelemetryTracingBridge<SdkLoggerProvider, SdkLogger>>,
+    Option<MetricsLayer<S>>,
+    Option<OpenTelemetryLayer<T, Tracer>>,
+);
+
 /// Telemetry configuration for the application.
 ///
 /// This struct provides methods to initialize telemetry with either stdout exporters
@@ -159,14 +166,7 @@ impl Telemetry {
         })
     }
 
-    fn build_layers<S, T>(
-        &self,
-    ) -> (
-        EnvFilter,
-        Option<OpenTelemetryTracingBridge<SdkLoggerProvider, SdkLogger>>,
-        Option<MetricsLayer<S>>,
-        Option<OpenTelemetryLayer<T, Tracer>>,
-    )
+    fn build_layers<S, T>(&self) -> LayerStack<S, T>
     where
         S: Subscriber + for<'span> LookupSpan<'span>,
         T: Subscriber + for<'span> LookupSpan<'span>,
