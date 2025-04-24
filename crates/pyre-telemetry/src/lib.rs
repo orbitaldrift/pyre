@@ -3,22 +3,26 @@ use std::time::Duration;
 use compound::{MetricsExporter, TracesExporter};
 use config::{Config, Endpoint, Layers, Mode, Temporality};
 use opentelemetry::{trace::TracerProvider, KeyValue};
+use opentelemetry_appender_tracing::layer::OpenTelemetryTracingBridge;
 use opentelemetry_otlp::{WithExportConfig, WithTonicConfig};
 use opentelemetry_resource_detectors::K8sResourceDetector;
 use opentelemetry_sdk::{
-    logs::SdkLoggerProvider,
+    logs::{SdkLogger, SdkLoggerProvider},
     metrics::SdkMeterProvider,
-    trace::{RandomIdGenerator, Sampler, SdkTracerProvider},
+    trace::{RandomIdGenerator, Sampler, SdkTracerProvider, Tracer},
     Resource,
 };
 use suspendable::{Suspendable, SuspendableLayer};
 use tracing::{
     info,
     subscriber::{DefaultGuard, SetGlobalDefaultError},
+    Subscriber,
 };
+use tracing_opentelemetry::{MetricsLayer, OpenTelemetryLayer};
 use tracing_subscriber::{
     fmt::{self, format::FmtSpan},
     layer::SubscriberExt,
+    registry::LookupSpan,
     util::{SubscriberInitExt, TryInitError},
     EnvFilter,
     Registry,
@@ -155,13 +159,18 @@ impl Telemetry {
         })
     }
 
-    /// Initialize the global telemetry providers and set up tracing subscribers.
-    ///
-    /// # Errors
-    /// If a global default subscriber has already been set, this function will return an error.
-    pub fn init(self) -> Result<Self, Error> {
-        info!(config = %self.config, "initializing global telemetry");
-
+    fn build_layers<S, T>(
+        &self,
+    ) -> (
+        EnvFilter,
+        Option<OpenTelemetryTracingBridge<SdkLoggerProvider, SdkLogger>>,
+        Option<MetricsLayer<S>>,
+        Option<OpenTelemetryLayer<T, Tracer>>,
+    )
+    where
+        S: Subscriber + for<'span> LookupSpan<'span>,
+        T: Subscriber + for<'span> LookupSpan<'span>,
+    {
         let filter = self.get_filter();
 
         let logs_layer = self
@@ -169,19 +178,31 @@ impl Telemetry {
             .as_ref()
             .map(opentelemetry_appender_tracing::layer::OpenTelemetryTracingBridge::new);
 
-        let metrics_layer = self
-            .meter_provider
-            .as_ref()
-            .map(|meter_provider| tracing_opentelemetry::MetricsLayer::new(meter_provider.clone()));
+        let metrics_layer = self.meter_provider.as_ref().map(|meter_provider| {
+            tracing_opentelemetry::MetricsLayer::<S>::new(meter_provider.clone())
+        });
+
+        let tracer_layer = self.tracer_provider.as_ref().map(|tracer_provider| {
+            tracing_opentelemetry::layer::<T>()
+                .with_tracer(tracer_provider.tracer(env!("CARGO_PKG_NAME").to_string()))
+        });
+
+        (filter, logs_layer, metrics_layer, tracer_layer)
+    }
+
+    /// Initialize the global telemetry providers and set up tracing subscribers.
+    ///
+    /// # Errors
+    /// If a global default subscriber has already been set, this function will return an error.
+    pub fn init(self) -> Result<Self, Error> {
+        info!(config = %self.config, "initializing global telemetry");
+
+        let (filter, logs_layer, metrics_layer, tracer_layer) = self.build_layers();
 
         // Prevent the meter provider from being dropped when the telemetry instance is dropped.
         // Please don't remove this, as it should be safe to drop the telemetry instance
         std::mem::forget(self.meter_provider);
 
-        let tracer_layer = self.tracer_provider.as_ref().map(|tracer_provider| {
-            tracing_opentelemetry::layer()
-                .with_tracer(tracer_provider.tracer(env!("CARGO_PKG_NAME").to_string()))
-        });
         Registry::default()
             .with(Self::default_fmt_layer())
             .with(filter)
@@ -196,6 +217,39 @@ impl Telemetry {
             logger_provider: self.logger_provider,
             config: self.config,
         })
+    }
+
+    /// Initialize the global telemetry providers and set up tracing subscribers.
+    ///
+    /// # Errors
+    /// If a global default subscriber has already been set, this function will return an error.
+    pub fn init_scoped(self) -> Result<(Self, DefaultGuard), Error> {
+        info!(config = %self.config, "initializing scoped telemetry");
+
+        let (filter, logs_layer, metrics_layer, tracer_layer) = self.build_layers();
+
+        // Prevent the meter provider from being dropped when the telemetry instance is dropped.
+        // Please don't remove this, as it should be safe to drop the telemetry instance
+        std::mem::forget(self.meter_provider);
+
+        let guard = tracing::subscriber::set_default(
+            Registry::default()
+                .with(Self::default_fmt_layer())
+                .with(filter)
+                .with(logs_layer)
+                .with(metrics_layer)
+                .with(tracer_layer),
+        );
+
+        Ok((
+            Self {
+                tracer_provider: self.tracer_provider,
+                meter_provider: None,
+                logger_provider: self.logger_provider,
+                config: self.config,
+            },
+            guard,
+        ))
     }
 
     fn get_metrics(
@@ -319,25 +373,62 @@ impl Telemetry {
 
 #[cfg(test)]
 mod tests {
+    #[tracing::instrument]
+    fn sum(a: i32, b: i32) -> i32 {
+        a + b
+    }
+
     #[test]
     fn test_default_init() {
-        {
-            let _guard = super::Telemetry::stdout();
-            tracing::info!("Test counter");
-
-            let telemetry = super::Telemetry::default().init().inspect_err(|e| {
-                tracing::error!("Failed to initialize telemetry: {}", e);
-            });
-            assert!(telemetry.is_ok());
-        }
+        let telemetry = super::Telemetry::default().init_scoped().inspect_err(|e| {
+            tracing::error!("Failed to initialize telemetry: {}", e);
+        });
+        assert!(telemetry.is_ok());
 
         tracing::info!(counter.foo = 1, "Test counter");
         tracing::info!(histogram.foo = 1, "Test histogram");
 
-        #[tracing::instrument]
-        fn sum(a: i32, b: i32) -> i32 {
-            a + b
-        }
+        sum(1, 1);
+    }
+
+    #[test]
+    fn test_stdout_scoped() {
+        let _guard = super::Telemetry::stdout();
+
+        tracing::info!(counter.foo = 1, "Test counter");
+        tracing::info!(histogram.foo = 1, "Test histogram");
+
+        sum(1, 1);
+    }
+
+    #[tokio::test]
+    async fn test_otlp_scoped() {
+        let info = super::Info {
+            id: "test_id".to_string(),
+            domain: "test_domain".to_string(),
+            meta: None,
+        };
+
+        let config = super::config::Config {
+            mode: super::config::Mode::Otlp,
+            layers: "metrics,layers,logs".to_string(),
+            level: "info".to_string(),
+            filter: vec![],
+            interval: 30,
+            temporality: super::config::Temporality::Cumulative,
+        };
+
+        let telemetry = super::Telemetry::new(&config, info)
+            .init_scoped()
+            .inspect_err(|e| {
+                tracing::error!("Failed to initialize telemetry: {}", e);
+            });
+        assert!(telemetry.is_ok());
+
+        let (_telemetry, _guard) = telemetry.unwrap();
+
+        tracing::info!(counter.foo = 1, "Test counter");
+        tracing::info!(histogram.foo = 1, "Test histogram");
 
         sum(1, 1);
     }

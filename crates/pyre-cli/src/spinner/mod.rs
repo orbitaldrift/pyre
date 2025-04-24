@@ -14,7 +14,7 @@ pub enum SpinnerTemplate {
 
 #[derive(Debug, Clone)]
 pub struct Spinner {
-    spinner: ProgressBar,
+    pub inner: ProgressBar,
     current_step: u8,
     total_steps: u8,
 }
@@ -49,7 +49,7 @@ impl Spinner {
         spinner.enable_steady_tick(Duration::from_millis(100));
 
         Spinner {
-            spinner,
+            inner: spinner,
             current_step: 1,
             total_steps,
         }
@@ -59,19 +59,19 @@ impl Spinner {
         // Leave the last step in the log.
         // indicatif sadly doesn't have anything nice to make that happen,
         // so we trick it into deleting some empty space instead of the last step
-        let msglen = self.spinner.message().len() + 1;
+        let msglen = self.inner.message().len() + 1;
         let spaces = " ".repeat(msglen);
         println!("{spaces}");
 
         self.current_step += 1;
 
-        self.spinner
+        self.inner
             .set_prefix(format!("[{}/{}]", self.current_step, self.total_steps));
-        self.spinner.set_message(message.to_string());
+        self.inner.set_message(message.to_string());
     }
 
     pub fn success(&self, message: &str) {
-        self.spinner.finish_with_message(format!(
+        self.inner.finish_with_message(format!(
             "{}✓ {}{}",
             color::Fg(color::Green),
             message,
@@ -80,23 +80,18 @@ impl Spinner {
     }
 
     pub fn fail(&self, message: &str) {
-        self.spinner.finish_with_message(format!(
+        self.inner.finish_with_message(format!(
             "{}✕ {}{}",
             color::Fg(color::Red),
             message,
             color::Fg(color::Reset)
         ));
     }
-
-    #[must_use]
-    pub fn inner(&self) -> &ProgressBar {
-        &self.spinner
-    }
 }
 
 impl Suspendable for Spinner {
     fn suspend<F: FnOnce() -> R, R>(&self, f: F) -> R {
-        self.spinner.suspend(f)
+        self.inner.suspend(f)
     }
 }
 
@@ -106,8 +101,18 @@ mod tests {
 
     #[test]
     fn test_spinner() {
-        let spinner = Spinner::new(10, "Loading...", &SpinnerTemplate::Default);
+        let mut spinner = Spinner::new(10, "Loading...", &SpinnerTemplate::Default);
         assert_eq!(spinner.current_step, 1);
         assert_eq!(spinner.total_steps, 10);
+
+        spinner.next_step("Step 2");
+        assert_eq!(spinner.current_step, 2);
+
+        spinner.success("Done");
+        assert_eq!(spinner.inner.is_finished(), true);
+
+        let spinner = Spinner::new(10, "Loading...", &SpinnerTemplate::Default);
+        spinner.fail("Failed");
+        assert_eq!(spinner.inner.is_finished(), true);
     }
 }
