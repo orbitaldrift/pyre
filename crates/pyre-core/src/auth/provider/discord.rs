@@ -132,6 +132,7 @@ pub async fn redirect(
                 .iter()
                 .map(|s| Scope::new(s.clone())),
         )
+        .add_extra_param("prompt", "none")
         .url();
 
     session.insert(CSRF_SESSION_KEY, csrf.secret()).await?;
@@ -139,7 +140,6 @@ pub async fn redirect(
     Ok(Redirect::to(auth_url.as_ref()))
 }
 
-#[axum::debug_handler]
 pub async fn auth(
     auth_session: AuthSession<SessionBackend>,
     session: Session,

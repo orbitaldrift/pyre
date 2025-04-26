@@ -33,15 +33,11 @@ strum = { workspace = true }
 bitflags = { workspace = true }
 garde = { workspace = true }
 
+opentelemetry = { workspace = true }
+
 tracing-subscriber = { workspace = true }
 
 tracing-opentelemetry = { version = "0.30.0" }
-
-opentelemetry = { version = "0.29.1", default-features = false, features = [
-    "trace",
-    "metrics",
-    "logs",
-] }
 
 opentelemetry-otlp = { version = "0.29.0", default-features = false, features = [
     "internal-logs",

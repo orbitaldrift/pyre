@@ -9,6 +9,10 @@ use crate::{
     svc::{server::HttpConfig, state::DbConfig, SessionConfig},
 };
 
+pub trait HasTelemetry {
+    fn telemetry(&self) -> &pyre_telemetry::config::Config;
+}
+
 #[derive(Validate, Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Config {
     #[garde(dive)]
@@ -23,6 +27,12 @@ pub struct Config {
     pub discord: provider::discord::Config,
     #[garde(dive)]
     pub telemetry: pyre_telemetry::config::Config,
+}
+
+impl HasTelemetry for Config {
+    fn telemetry(&self) -> &pyre_telemetry::config::Config {
+        &self.telemetry
+    }
 }
 
 impl std::fmt::Display for Config {

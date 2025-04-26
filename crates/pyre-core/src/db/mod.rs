@@ -1,5 +1,7 @@
 #![allow(dead_code)]
 
+pub mod sync;
+
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error(transparent)]

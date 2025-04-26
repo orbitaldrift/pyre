@@ -69,8 +69,8 @@ impl From<Temporality> for opentelemetry_sdk::metrics::Temporality {
 pub enum Mode {
     #[default]
     Stdout,
-    Alloy,
     Otlp,
+    OtlpAlt,
     Dual,
     Custom(Vec<String>),
 }
@@ -79,10 +79,10 @@ impl From<Mode> for Vec<Endpoint> {
     fn from(value: Mode) -> Self {
         match value {
             Mode::Stdout => vec![],
-            Mode::Alloy => vec![Endpoint::LocalAlloy],
             Mode::Otlp => vec![Endpoint::LocalOtlp],
+            Mode::OtlpAlt => vec![Endpoint::LocalOtlpAlt],
             Mode::Dual => {
-                vec![Endpoint::LocalAlloy, Endpoint::LocalOtlp]
+                vec![Endpoint::LocalOtlp, Endpoint::LocalOtlpAlt]
             }
             Mode::Custom(endpoints) => endpoints.into_iter().map(Endpoint::Other).collect(),
         }
@@ -92,9 +92,9 @@ impl From<Mode> for Vec<Endpoint> {
 #[derive(Debug, strum::Display, Clone, Serialize, Deserialize)]
 pub enum Endpoint {
     #[strum(to_string = "http://localhost:4317")]
-    LocalAlloy,
-    #[strum(to_string = "http://localhost:4318")]
     LocalOtlp,
+    #[strum(to_string = "http://localhost:4318")]
+    LocalOtlpAlt,
     #[strum(to_string = "{0}")]
     Other(String),
 }

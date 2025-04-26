@@ -79,7 +79,7 @@ impl Telemetry {
     pub fn new(config: &Config, info: Info) -> Self {
         match config.mode {
             Mode::Stdout => Self::new_with_stdout(config),
-            Mode::Alloy | Mode::Otlp | Mode::Dual | Mode::Custom(_) => {
+            Mode::Otlp | Mode::OtlpAlt | Mode::Dual | Mode::Custom(_) => {
                 let resource = Self::get_resource(info);
                 Self::new_with_otlp(config, &resource)
             }
@@ -331,7 +331,7 @@ impl Telemetry {
         let exporter = opentelemetry_otlp::LogExporter::builder()
             .with_tonic()
             .with_compression(opentelemetry_otlp::Compression::Zstd)
-            .with_export_config(Endpoint::LocalAlloy.into())
+            .with_export_config(Endpoint::LocalOtlp.into())
             .build()
             .expect("Failed to create log exporter");
 
@@ -410,8 +410,8 @@ mod tests {
         };
 
         let config = super::config::Config {
-            mode: super::config::Mode::Otlp,
-            layers: "metrics,layers,logs".to_string(),
+            mode: super::config::Mode::OtlpAlt,
+            layers: "metrics,traces,logs".to_string(),
             level: "info".to_string(),
             filter: vec![],
             interval: 30,

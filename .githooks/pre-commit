@@ -1,7 +1,10 @@
+#!/bin/sh
+
 RED='\033[0;31m'
 RESET='\033[0m'
 
 check_fmt () {
+    echo "Cargo fmt"
     if ! cargo +nightly fmt -- --check; then
         echo -e "${RED}Commit error!${RESET}"
         echo "Please format the code via 'cargo +nightly fmt'."
@@ -10,9 +13,13 @@ check_fmt () {
 }
 
 check_clippy () {
+    echo "Cargo clippy"
     if ! cargo clippy --all-targets --all-features -- -D warnings -W clippy::pedantic -W clippy::all; then
         echo -e "${RED}Commit error!${RESET}"
         echo "Please fix the clippy warnings."
         exit 1
     fi
 }
+
+check_fmt
+check_clippy

@@ -1,0 +1,15 @@
+[db]
+redis = "redis://localhost:6379"
+pg = "postgres://postgres:postgres@localhost:5432/pyre"
+
+[telemetry]
+mode = { Stdout = {} }
+layers = "metrics,traces"
+level = "info"
+filter = ["tower_sessions=warn", "axum_login=warn"]
+interval = 10
+temporality = { Cumulative = {} }
+
+[sync]
+api = { Scryfall = { url = "https://api.scryfall.com", path = "bulk-data" } }
+freq = 120
