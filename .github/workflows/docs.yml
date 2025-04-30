@@ -21,7 +21,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2204
     defaults:
       run:
         working-directory: docs
@@ -35,7 +35,7 @@ jobs:
         with:
           version: 8
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: useblacksmith/setup-node@v5
         with:
           cache-dependency-path: docs/pnpm-lock.yaml
           node-version: 20
@@ -57,7 +57,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2204
     name: Deploy
     steps:
       - name: Deploy to GitHub Pages

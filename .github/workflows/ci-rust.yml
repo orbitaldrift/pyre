@@ -22,7 +22,7 @@ env:
 jobs:
   clippy:
     name: Clippy
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2204
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust toolchain
@@ -35,7 +35,7 @@ jobs:
         uses: mozilla-actions/sccache-action@v0.0.8
 
       - name: Rust Cache
-        uses: Swatinem/rust-cache@v2
+        uses: useblacksmith/rust-cache@v3
 
       - name: Install mold
         uses: rui314/setup-mold@v1
@@ -45,7 +45,7 @@ jobs:
 
   formatting:
     name: Formatting
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2204
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust toolchain
@@ -59,7 +59,7 @@ jobs:
 
   coverage:
     name: Test
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-8vcpu-ubuntu-2204
     if: github.ref == 'refs/heads/master'
     steps:
       - uses: actions/checkout@v4
@@ -74,7 +74,7 @@ jobs:
         uses: mozilla-actions/sccache-action@v0.0.8
 
       - name: Rust Cache
-        uses: Swatinem/rust-cache@v2
+        uses: useblacksmith/rust-cache@v3
 
       - name: Install mold
         uses: rui314/setup-mold@v1
