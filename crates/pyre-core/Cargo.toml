@@ -67,7 +67,7 @@ axum = { workspace = true, features = [
 
 tikv-jemallocator = { version = "0.6.0" }
 
-uuid = { version = "1.16.0", features = ["v4"] }
+uuid = { version = "1.16.0", features = ["v4", "serde"] }
 
 oauth2 = "5.0.0"
 reqwest = { version = "0.12.15", default-features = false, features = [

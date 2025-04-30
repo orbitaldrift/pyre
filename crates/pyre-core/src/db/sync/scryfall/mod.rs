@@ -10,6 +10,7 @@ use super::config;
 
 pub mod bulk;
 pub mod card;
+pub mod db_card;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -67,6 +68,11 @@ impl ScryfallSync {
 
         let bulk = Self::get_bulk(&client, &url).await?;
         info!(%bulk, "downloaded bulk metadata");
+
+        // Filter MTGO only cards (with games[] with mtgo only)
+        // Populate symbology table using /symbology
+        // Card faces should always be present even with a single card face (card_faces null or empty)
+        // Sometimes card faces is present, but the images are in the original card object, so move them over
 
         // loop {
         //     tokio::select! {

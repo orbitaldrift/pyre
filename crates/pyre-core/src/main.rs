@@ -22,8 +22,9 @@ mod svc;
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
-#[derive(Debug, Clone, Copy, strum::Display, clap::ValueEnum)]
+#[derive(Debug, Default, Clone, Copy, strum::Display, clap::ValueEnum)]
 enum CliMode {
+    #[default]
     Server,
     DbSync,
 }
@@ -32,7 +33,7 @@ enum CliMode {
 /// There are two modes: server and dbsync
 /// The server mode starts the Pyre server
 /// The dbsync mode syncs the database with scryfall
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Default)]
 #[command(version, about, long_about = None)]
 struct Cli {
     /// Application mode
@@ -46,6 +47,8 @@ struct Cli {
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> color_eyre::Result<()> {
+    // Turnstile support on /redirect for auth
+
     // Download and index in SQL scryfall database only in english
     // Graphql + Moka for in memory cache for GraphQL read only queries
     // Strong input validation around invariants
@@ -56,7 +59,7 @@ async fn main() -> color_eyre::Result<()> {
     build_info!();
     color_eyre::install()?;
 
-    let cli = Cli::parse();
+    let cli = Cli::try_parse().unwrap_or_default();
 
     let shutdown = Shutdown::new_with_all_signals().install();
 
